@@ -24,6 +24,10 @@ use App\Models\AirConditioner;
 // 1. ROUTE PUBLIC (KHÔNG CẦN ĐĂNG NHẬP)
 // ==============================
 
+Route::get('/up', function () {
+    return response()->json(['status' => 'ok']);
+});
+
 // GHN chỉ được dùng để tra cứu địa chỉ, không tạo vận đơn và không gửi dữ liệu đơn hàng.
 Route::prefix('ghn')->group(function () {
     Route::get('/provinces', [OrderController::class, 'getProvinces']);
