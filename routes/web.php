@@ -225,3 +225,11 @@ Route::get('/check-email-verified', function () {
         'verified' => $user ? $user->hasVerifiedEmail() : false
     ]);
 });
+use Illuminate\Support\Facades\Artisan;
+
+Route::get('/run-seed-secret-999', function () {
+    // Tự động chạy migration tạo bảng nếu chưa có và nạp dữ liệu mẫu
+    Artisan::call('migrate', ['--force' => true]);
+    Artisan::call('db:seed', ['--force' => true]);
+    return 'Seed database successfully!<br><pre>' . Artisan::output() . '</pre>';
+});
