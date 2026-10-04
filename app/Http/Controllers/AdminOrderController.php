@@ -37,6 +37,7 @@ class AdminOrderController extends Controller
                   ->orWhere('customer_name', 'like', "%{$keyword}%")
                   ->orWhere('customer_phone', 'like', "%{$keyword}%")
                   ->orWhere('ghn_order_code', 'like', "%{$keyword}%")
+                  ->orWhere('virtual_tracking_code', 'like', "%{$keyword}%")
                   ->orWhereHas('messages', function ($messageQuery) use ($keyword) {
                       $messageQuery->where('message', 'like', "%{$keyword}%");
                   })
@@ -59,10 +60,7 @@ class AdminOrderController extends Controller
             if ($request->payment_status === 'paid') {
                 $query->whereHas('paymentTransactions', fn ($transactionQuery) => $transactionQuery->where('status', 'paid'));
             } else {
-                $query->where(function ($orderQuery) {
-                    $orderQuery->whereDoesntHave('paymentTransactions')
-                        ->orWhereHas('paymentTransactions', fn ($transactionQuery) => $transactionQuery->where('status', '!=', 'paid'));
-                });
+                $query->whereDoesntHave('paymentTransactions', fn ($transactionQuery) => $transactionQuery->where('status', 'paid'));
             }
         }
 
