@@ -70,8 +70,7 @@ class AdminOrderPrintController extends Controller
     private function filteredOrders(Request $request)
     {
         $query = Order::with(['items', 'paymentTransactions', 'printHistories'])
-            ->whereIn('status', $this->printableDatabaseStatuses())
-            ->latest();
+            ->whereIn('status', $this->printableDatabaseStatuses());
 
         if ($request->filled('keyword')) {
             $keyword = trim($request->keyword);
@@ -112,9 +111,9 @@ class AdminOrderPrintController extends Controller
             $query->whereDoesntHave('printHistories');
         }
 
-        if ($request->input('sort') === 'oldest') {
-            $query->oldest();
-        }
+        $request->input('sort') === 'oldest'
+            ? $query->oldest('created_at')
+            : $query->latest('created_at');
 
         return $query;
     }

@@ -28,7 +28,7 @@ class AdminOrderController extends Controller
 
     private function orderQuery(Request $request)
     {
-        $query = Order::with(['items', 'messages.sender', 'chatMessages.sender', 'paymentTransactions'])->latest();
+        $query = Order::with(['items', 'messages.sender', 'chatMessages.sender', 'paymentTransactions']);
 
         if ($request->filled('keyword')) {
             $keyword = trim($request->keyword);
@@ -72,9 +72,9 @@ class AdminOrderController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        if ($request->input('sort') === 'oldest') {
-            $query->oldest();
-        }
+        $request->input('sort') === 'oldest'
+            ? $query->oldest('created_at')
+            : $query->latest('created_at');
 
         return $query;
     }
