@@ -24,7 +24,7 @@
         </div>
     @endif
 
-    <form action="{{ route('air_conditioners.store') }}" method="POST" enctype="multipart/form-data" id="product-form">
+    <form action="{{ route('air_conditioners.store') }}" method="POST" id="product-form">
         @csrf
         <!-- 1. Thông tin chung sản phẩm -->
         <div class="card border-0 shadow-sm mb-4 product-form-section" id="basic-section">
@@ -66,7 +66,7 @@
 
                     <div class="col-md-5 product-form-section" id="image-section">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Ảnh sản phẩm (có thể chọn nhiều ảnh)</label>
+                            <label class="form-label fw-semibold">Link ảnh sản phẩm (tối đa 5 ảnh)</label>
                             <div class="border rounded p-3 text-center bg-light mb-2">
                                 <img id="preview-img" src="#" alt="Preview" class="img-fluid d-none" style="max-height: 200px; object-fit: contain;">
                                 <div id="preview-placeholder" class="text-muted py-4">
@@ -75,8 +75,12 @@
                                 </div>
                                 <div id="selected-gallery-preview" class="d-flex flex-wrap justify-content-center gap-2 mt-2"></div>
                             </div>
-                            <input type="file" name="images[]" id="image-input" class="form-control" accept="image/*" multiple>
-                            <small id="selected-image-count" class="form-text text-muted">Có thể chọn nhiều ảnh cùng lúc.</small>
+                            <div class="row g-2">
+                                @for($imageIndex = 0; $imageIndex < 5; $imageIndex++)
+                                    <div class="col-12"><input type="url" name="images[]" class="form-control product-image-url" placeholder="https://example.com/anh-{{ $imageIndex + 1 }}.jpg" value="{{ old('images.'.$imageIndex) }}"></div>
+                                @endfor
+                            </div>
+                            <small class="form-text text-muted">Dán đường link ảnh công khai từ internet.</small>
                         </div>
                     </div>
                 </div>
@@ -245,42 +249,20 @@
         });
     })();
 
-    const imageInput = document.getElementById('image-input');
-    let selectedFiles = [];
-    imageInput.addEventListener('change', function(e) {
-        const filesByKey = new Map(selectedFiles.map((file) => [`${file.name}-${file.size}-${file.lastModified}`, file]));
-        Array.from(e.target.files).forEach((file) => {
-            filesByKey.set(`${file.name}-${file.size}-${file.lastModified}`, file);
+    document.querySelectorAll('.product-image-url').forEach((input) => {
+        input.addEventListener('input', () => {
+            const firstUrl = Array.from(document.querySelectorAll('.product-image-url')).map((field) => field.value.trim()).find(Boolean);
+            const preview = document.getElementById('preview-img');
+            const placeholder = document.getElementById('preview-placeholder');
+            if (firstUrl) {
+                preview.src = firstUrl;
+                preview.classList.remove('d-none');
+                placeholder.classList.add('d-none');
+            } else {
+                preview.classList.add('d-none');
+                placeholder.classList.remove('d-none');
+            }
         });
-        selectedFiles = Array.from(filesByKey.values());
-        const transfer = new DataTransfer();
-        selectedFiles.forEach((file) => transfer.items.add(file));
-        imageInput.files = transfer.files;
-
-        const files = selectedFiles;
-        const preview = document.getElementById('selected-gallery-preview');
-        const count = document.getElementById('selected-image-count');
-        preview.innerHTML = '';
-        count.textContent = files.length ? `Đã chọn ${files.length} ảnh.` : 'Có thể chọn nhiều ảnh cùng lúc.';
-
-        if (files.length) {
-            const mainImage = document.getElementById('preview-img');
-            mainImage.src = URL.createObjectURL(files[0]);
-            mainImage.classList.remove('d-none');
-            document.getElementById('preview-placeholder').classList.add('d-none');
-
-            files.forEach((file) => {
-                const image = document.createElement('img');
-                image.src = URL.createObjectURL(file);
-                image.alt = file.name;
-                image.title = file.name;
-                image.style.cssText = 'width: 58px; height: 58px; object-fit: cover; border-radius: 4px;';
-                preview.appendChild(image);
-            });
-        } else {
-            document.getElementById('preview-img').classList.add('d-none');
-            document.getElementById('preview-placeholder').classList.remove('d-none');
-        }
     });
 
     // Dynamic thêm nhiều biến thể

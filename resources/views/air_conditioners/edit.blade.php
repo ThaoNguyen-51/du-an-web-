@@ -24,7 +24,7 @@
         </div>
     @endif
 
-    <form action="{{ route('air_conditioners.update', $airConditioner->id) }}" method="POST" enctype="multipart/form-data" id="product-form">
+    <form action="{{ route('air_conditioners.update', $airConditioner->id) }}" method="POST" id="product-form">
         @csrf
         @method('PUT')
         <!-- 1. Thông tin chung -->
@@ -71,7 +71,7 @@
                             <div class="border rounded p-3 text-center bg-light mb-2">
                                 @php $displayMainImage = $airConditioner->primary_image_path ?? $airConditioner->image; @endphp
                                 @if($displayMainImage)
-                                    <img id="preview-img" src="{{ request()->getBaseUrl() . '/storage/' . $displayMainImage }}" class="img-fluid" style="max-height: 200px; object-fit: contain;">
+                                    <img id="preview-img" src="{{ filter_var($displayMainImage, FILTER_VALIDATE_URL) ? $displayMainImage : request()->getBaseUrl() . '/storage/' . $displayMainImage }}" class="img-fluid" style="max-height: 200px; object-fit: contain;">
                                 @else
                                     <img id="preview-img" src="#" alt="Preview" class="img-fluid d-none" style="max-height: 200px; object-fit: contain;">
                                     <div id="preview-placeholder" class="text-muted py-4">
@@ -81,13 +81,13 @@
                                 <div id="existing-gallery-preview" class="d-flex flex-wrap justify-content-center gap-2 mt-2">
                                     @forelse($airConditioner->images as $productImage)
                                         <div class="position-relative gallery-image-item">
-                                            <img src="{{ request()->getBaseUrl() . '/storage/' . $productImage->image_path }}" alt="Ảnh sản phẩm" title="Ảnh sản phẩm" style="width: 58px; height: 58px; object-fit: cover; border-radius: 4px;">
+                                            <img src="{{ filter_var($productImage->image_path, FILTER_VALIDATE_URL) ? $productImage->image_path : request()->getBaseUrl() . '/storage/' . $productImage->image_path }}" alt="Ảnh sản phẩm" title="Ảnh sản phẩm" style="width: 58px; height: 58px; object-fit: cover; border-radius: 4px;">
                                             <button type="button" class="btn btn-danger btn-sm remove-gallery-image position-absolute top-0 end-0 p-0" data-image-id="{{ $productImage->id }}" aria-label="Xóa ảnh" title="Xóa ảnh" style="width: 20px; height: 20px; line-height: 1;"><i class="fa-solid fa-xmark"></i></button>
                                         </div>
                                     @empty
                                         @if($airConditioner->image)
                                             <div class="position-relative gallery-image-item">
-                                                <img src="{{ request()->getBaseUrl() . '/storage/' . $airConditioner->image }}" alt="Ảnh sản phẩm" title="Ảnh sản phẩm" style="width: 58px; height: 58px; object-fit: cover; border-radius: 4px;">
+                                                <img src="{{ filter_var($airConditioner->image, FILTER_VALIDATE_URL) ? $airConditioner->image : request()->getBaseUrl() . '/storage/' . $airConditioner->image }}" alt="Ảnh sản phẩm" title="Ảnh sản phẩm" style="width: 58px; height: 58px; object-fit: cover; border-radius: 4px;">
                                                 <button type="button" class="btn btn-danger btn-sm remove-gallery-image position-absolute top-0 end-0 p-0" data-legacy-image="1" aria-label="Xóa ảnh" title="Xóa ảnh" style="width: 20px; height: 20px; line-height: 1;"><i class="fa-solid fa-xmark"></i></button>
                                             </div>
                                         @endif
@@ -96,8 +96,12 @@
                                 <div id="selected-gallery-preview" class="d-flex flex-wrap justify-content-center gap-2 mt-2"></div>
                                 <div id="removed-gallery-inputs"></div>
                             </div>
-                            <input type="file" name="images[]" id="image-input" class="form-control" accept="image/*" multiple>
-                            <small id="selected-image-count" class="form-text text-muted">Ảnh mới sẽ được thêm vào gallery hiện tại.</small>
+                            <div class="row g-2">
+                                @for($imageIndex = 0; $imageIndex < 5; $imageIndex++)
+                                    <div class="col-12"><input type="url" name="images[]" class="form-control product-image-url" placeholder="https://example.com/anh-{{ $imageIndex + 1 }}.jpg"></div>
+                                @endfor
+                            </div>
+                            <small class="form-text text-muted">Dán link ảnh mới; ảnh sẽ được thêm vào gallery hiện tại.</small>
                         </div>
                     </div>
                 </div>
@@ -270,40 +274,15 @@
         });
     })();
 
-    const imageInput = document.getElementById('image-input');
-    let selectedFiles = [];
-    imageInput.addEventListener('change', function(e) {
-        const filesByKey = new Map(selectedFiles.map((file) => [`${file.name}-${file.size}-${file.lastModified}`, file]));
-        Array.from(e.target.files).forEach((file) => {
-            filesByKey.set(`${file.name}-${file.size}-${file.lastModified}`, file);
+    document.querySelectorAll('.product-image-url').forEach((input) => {
+        input.addEventListener('input', () => {
+            const firstUrl = Array.from(document.querySelectorAll('.product-image-url')).map((field) => field.value.trim()).find(Boolean);
+            const preview = document.getElementById('preview-img');
+            if (firstUrl) {
+                preview.src = firstUrl;
+                preview.classList.remove('d-none');
+            }
         });
-        selectedFiles = Array.from(filesByKey.values());
-        const transfer = new DataTransfer();
-        selectedFiles.forEach((file) => transfer.items.add(file));
-        imageInput.files = transfer.files;
-
-        const files = selectedFiles;
-        const preview = document.getElementById('selected-gallery-preview');
-        const count = document.getElementById('selected-image-count');
-        preview.innerHTML = '';
-        count.textContent = files.length ? `Sẽ thêm ${files.length} ảnh mới vào gallery.` : 'Ảnh mới sẽ được thêm vào gallery hiện tại.';
-
-        if (files.length) {
-            const mainImage = document.getElementById('preview-img');
-            mainImage.src = URL.createObjectURL(files[0]);
-            mainImage.classList.remove('d-none');
-            const placeholder = document.getElementById('preview-placeholder');
-            if (placeholder) placeholder.classList.add('d-none');
-
-            files.forEach((file) => {
-                const image = document.createElement('img');
-                image.src = URL.createObjectURL(file);
-                image.alt = file.name;
-                image.title = file.name;
-                image.style.cssText = 'width: 58px; height: 58px; object-fit: cover; border-radius: 4px;';
-                preview.appendChild(image);
-            });
-        }
     });
 
     document.addEventListener('click', function(e) {

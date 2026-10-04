@@ -7,7 +7,6 @@ use App\Models\Order;
 use App\Models\ProductReview;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Storage;
 
 class ProductReviewController extends Controller
 {
@@ -18,7 +17,7 @@ class ProductReviewController extends Controller
             'rating' => 'required|integer|between:1,5',
             'comment' => 'required|string|min:5|max:2000',
             'images' => 'nullable|array|max:5',
-            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:3072',
+            'images.*' => 'nullable|url|max:2048',
         ]);
 
         $order = $request->user()->orders()
@@ -47,9 +46,9 @@ class ProductReviewController extends Controller
             ]);
         }
 
-        $imagePaths = collect($request->file('images', []))
-            ->filter(fn ($file) => $file->isValid())
-            ->map(fn ($file) => $file->store('reviews', 'public'))
+        $imageUrls = collect($data['images'] ?? [])
+            ->map(fn ($url) => trim($url))
+            ->filter()
             ->values()
             ->all();
 
@@ -58,7 +57,7 @@ class ProductReviewController extends Controller
             'order_id' => $order->id,
             'rating' => $data['rating'],
             'comment' => trim($data['comment']),
-            'images' => $imagePaths ?: null,
+            'images' => $imageUrls ?: null,
         ]);
 
         return back()->with('success', 'Cảm ơn bạn đã gửi đánh giá sản phẩm.');

@@ -26,7 +26,7 @@
     if (empty($galleryImages) && $airConditioner->image) {
         $galleryImages = [$airConditioner->image];
     }
-    $galleryImageUrls = array_map(fn ($imagePath) => request()->getBaseUrl() . '/storage/' . $imagePath, $galleryImages);
+    $galleryImageUrls = array_map(fn ($imagePath) => filter_var($imagePath, FILTER_VALIDATE_URL) ? $imagePath : request()->getBaseUrl() . '/storage/' . $imagePath, $galleryImages);
 @endphp
 
 <style>

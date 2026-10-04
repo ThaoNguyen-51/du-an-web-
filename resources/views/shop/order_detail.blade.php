@@ -206,8 +206,13 @@
                                                                     @if(!empty($item->purchaseReview->images))
                                                                         <div class="d-flex flex-wrap gap-2 mt-2">
                                                                             @foreach($item->purchaseReview->images as $reviewImage)
-                                                                                <a href="{{ asset('storage/'.$reviewImage) }}" target="_blank" rel="noopener">
-                                                                                    <img src="{{ asset('storage/'.$reviewImage) }}" alt="Ảnh đánh giá" class="rounded border" style="width:58px;height:58px;object-fit:cover;">
+                                                                                @php
+                                                                                    $reviewImageUrl = filter_var($reviewImage, FILTER_VALIDATE_URL)
+                                                                                        ? $reviewImage
+                                                                                        : asset('storage/' . $reviewImage);
+                                                                                @endphp
+                                                                                <a href="{{ $reviewImageUrl }}" target="_blank" rel="noopener">
+                                                                                    <img src="{{ $reviewImageUrl }}" alt="Ảnh đánh giá" class="rounded border" style="width:58px;height:58px;object-fit:cover;">
                                                                                 </a>
                                                                             @endforeach
                                                                         </div>

@@ -371,7 +371,7 @@
                         <a href="{{ route('shop.detail', $item->id) }}" class="product-thumb text-center">
                             @php $productImage = $item->primary_image_path ?? $item->image; @endphp
                             @if($productImage)
-                                <img src="{{ request()->getBaseUrl() . '/storage/' . $productImage }}" alt="{{ $item->name }}">
+                                <img src="{{ filter_var($productImage, FILTER_VALIDATE_URL) ? $productImage : request()->getBaseUrl() . '/storage/' . $productImage }}" alt="{{ $item->name }}">
                             @else
                                 <div class="bg-light d-flex align-items-center justify-content-center text-muted rounded" style="height: 190px;">
                                     <i class="fa-regular fa-image me-2"></i>Không có ảnh

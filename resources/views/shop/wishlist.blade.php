@@ -10,7 +10,7 @@
             @foreach($items as $item)
                 <div class="col-md-6 col-xl-4">
                     <article class="card h-100 border-0 shadow-sm overflow-hidden">
-                        <img src="{{ $item->product->primary_image_path ? asset('storage/'.$item->product->primary_image_path) : asset('images/no-image.png') }}" class="card-img-top" style="height:210px;object-fit:cover" alt="{{ $item->product->name }}">
+                        <img src="{{ $item->product->primary_image_path ? (filter_var($item->product->primary_image_path, FILTER_VALIDATE_URL) ? $item->product->primary_image_path : asset('storage/'.$item->product->primary_image_path)) : asset('images/no-image.png') }}" class="card-img-top" style="height:210px;object-fit:cover" alt="{{ $item->product->name }}">
                         <div class="card-body d-flex flex-column">
                             @if($item->price_dropped)<div class="alert alert-success py-2 small"><i class="fa-solid fa-arrow-trend-down me-1"></i>Sản phẩm đã giảm giá.</div>@endif
                             @if($item->back_in_stock)<div class="alert alert-info py-2 small"><i class="fa-solid fa-bell me-1"></i>Sản phẩm đã có hàng trở lại.</div>@endif

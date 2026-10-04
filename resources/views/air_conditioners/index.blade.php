@@ -94,7 +94,7 @@
                                     <div class="border rounded p-1 bg-white text-center" style="width: 50px; height: 50px;">
                                         @php $productImage = $item->primary_image_path ?? $item->image; @endphp
                                         @if($productImage)
-                                            <img src="{{ request()->getBaseUrl() . '/storage/' . $productImage }}" class="w-100 h-100" style="object-fit: contain;">
+                                            <img src="{{ filter_var($productImage, FILTER_VALIDATE_URL) ? $productImage : request()->getBaseUrl() . '/storage/' . $productImage }}" class="w-100 h-100" style="object-fit: contain;">
                                         @else
                                             <i class="fa-regular fa-image fs-4 text-muted mt-1"></i>
                                         @endif

@@ -5,25 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\AirConditioner;
 use App\Models\AirConditionerVariant;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use App\Services\AdminActivityLogger;
 
 class AirConditionerController extends Controller
 {
-    private function syncProductGallery(AirConditioner $airConditioner, array $uploadedFiles = [], ?UploadedFile $legacyImage = null, bool $append = false): void
+    private function syncProductGallery(AirConditioner $airConditioner, array $imageUrls = [], bool $append = false): void
     {
-        $paths = [];
-
-        foreach ($uploadedFiles as $file) {
-            if ($file instanceof UploadedFile && $file->isValid()) {
-                $paths[] = $file->store('products', 'public');
-            }
-        }
-
-        if (empty($paths) && $legacyImage instanceof UploadedFile && $legacyImage->isValid()) {
-            $paths[] = $legacyImage->store('products', 'public');
-        }
+        $paths = collect($imageUrls)->map(fn ($url) => trim($url))->filter()->values()->all();
 
         if (empty($paths)) {
             return;
@@ -111,7 +100,7 @@ class AirConditionerController extends Controller
             'brand' => 'required|string|max:255',
             'price' => 'required|numeric',
             'images' => 'nullable|array',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'images.*' => 'nullable|url|max:2048',
             'variants' => 'required|array|min:1',
             'variants.*.capacity_name' => 'required|string',
             'variants.*.price' => 'required|numeric',
@@ -122,8 +111,8 @@ class AirConditionerController extends Controller
 
         $airConditioner = AirConditioner::create($productData);
 
-        if ($request->hasFile('images') || $request->hasFile('image')) {
-            $this->syncProductGallery($airConditioner, $request->file('images', []), $request->file('image'));
+        if ($request->filled('images')) {
+            $this->syncProductGallery($airConditioner, $request->input('images', []));
         }
 
         foreach ($request->variants as $variantData) {
@@ -162,9 +151,9 @@ class AirConditionerController extends Controller
             'brand'                 => 'required|string|max:255',
             'price'                 => 'required|numeric',
             'weight'                => 'nullable|integer|min:100',
-            'image'                 => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'image'                 => 'nullable|url|max:2048',
             'images'                => 'nullable|array',
-            'images.*'              => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'images.*'              => 'nullable|url|max:2048',
             'remove_images'         => 'nullable|array',
             'remove_images.*'       => 'integer',
             'remove_legacy_image'   => 'nullable|boolean',
@@ -192,8 +181,8 @@ class AirConditionerController extends Controller
         $data['weight'] = $request->input('weight', 25000);
         $legacyImagePath = $airConditioner->image;
 
-        if ($request->hasFile('images') || $request->hasFile('image')) {
-            $this->syncProductGallery($airConditioner, $request->file('images', []), $request->file('image'), true);
+        if ($request->filled('images')) {
+            $this->syncProductGallery($airConditioner, $request->input('images', []), true);
         }
 
         $airConditioner->update($data);

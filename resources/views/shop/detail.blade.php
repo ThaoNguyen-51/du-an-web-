@@ -135,11 +135,11 @@
                             if (empty($galleryImages) && $airConditioner->image) {
                                 $galleryImages = [$airConditioner->image];
                             }
-                            $galleryImageUrls = array_map(fn ($imagePath) => request()->getBaseUrl() . '/storage/' . $imagePath, $galleryImages);
+                            $galleryImageUrls = array_map(fn ($imagePath) => filter_var($imagePath, FILTER_VALIDATE_URL) ? $imagePath : request()->getBaseUrl() . '/storage/' . $imagePath, $galleryImages);
                             $displayMainImage = $galleryImages[0] ?? null;
                         @endphp
                         @if($displayMainImage)
-                            <img id="main-product-img" src="{{ request()->getBaseUrl() . '/storage/' . $displayMainImage }}" class="img-fluid" style="max-height: 300px; object-fit: contain;" alt="{{ $airConditioner->name }}">
+                            <img id="main-product-img" src="{{ filter_var($displayMainImage, FILTER_VALIDATE_URL) ? $displayMainImage : request()->getBaseUrl() . '/storage/' . $displayMainImage }}" class="img-fluid" style="max-height: 300px; object-fit: contain;" alt="{{ $airConditioner->name }}">
                             @if(count($galleryImageUrls) > 1)
                                 <button type="button" class="btn btn-light border shadow-sm gallery-nav-btn" data-direction="-1" aria-label="Ảnh trước" title="Ảnh trước" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); z-index:2; width:40px; height:40px;">&lt;</button>
                                 <button type="button" class="btn btn-light border shadow-sm gallery-nav-btn" data-direction="1" aria-label="Ảnh tiếp theo" title="Ảnh tiếp theo" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); z-index:2; width:40px; height:40px;">&gt;</button>
@@ -156,7 +156,7 @@
                         <div class="d-flex flex-wrap justify-content-center gap-2">
                             @foreach($galleryImages as $galleryImage)
                                 <button type="button" class="btn btn-light border p-1 thumbnail-btn" data-index="{{ $loop->index }}">
-                                    <img src="{{ request()->getBaseUrl() . '/storage/' . $galleryImage }}" alt="Ảnh sản phẩm" style="width: 62px; height: 62px; object-fit: cover; border-radius: 8px;">
+                                    <img src="{{ filter_var($galleryImage, FILTER_VALIDATE_URL) ? $galleryImage : request()->getBaseUrl() . '/storage/' . $galleryImage }}" alt="Ảnh sản phẩm" style="width: 62px; height: 62px; object-fit: cover; border-radius: 8px;">
                                 </button>
                             @endforeach
                         </div>
@@ -311,8 +311,13 @@
                     @if(!empty($review->images))
                         <div class="d-flex flex-wrap gap-2 mb-2">
                             @foreach($review->images as $reviewImage)
-                                <a href="{{ asset('storage/'.$reviewImage) }}" target="_blank" rel="noopener">
-                                    <img src="{{ asset('storage/'.$reviewImage) }}" alt="Ảnh đánh giá" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;">
+                                @php
+                                    $reviewImageUrl = filter_var($reviewImage, FILTER_VALIDATE_URL)
+                                        ? $reviewImage
+                                        : asset('storage/' . $reviewImage);
+                                @endphp
+                                <a href="{{ $reviewImageUrl }}" target="_blank" rel="noopener">
+                                    <img src="{{ $reviewImageUrl }}" alt="Ảnh đánh giá" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;">
                                 </a>
                             @endforeach
                         </div>
@@ -329,7 +334,7 @@
             @endforelse
 
             @if(auth()->user()->role === 'user' && $eligibleReviewOrders->isNotEmpty())
-                <form action="{{ route('product-reviews.store', $airConditioner) }}" method="POST" enctype="multipart/form-data" class="mt-4">
+                <form action="{{ route('product-reviews.store', $airConditioner) }}" method="POST" class="mt-4">
                     @csrf
                     <h6 class="fw-bold mb-3">Viết đánh giá</h6>
                     <div class="row g-3">
@@ -356,8 +361,15 @@
                             <textarea id="review-comment" name="comment" class="form-control" rows="4" minlength="5" maxlength="2000" required>{{ old('comment') }}</textarea>
                         </div>
                         <div class="col-12">
-                            <label for="review-images" class="form-label">Hình ảnh (tối đa 5 ảnh)</label>
-                            <input id="review-images" type="file" name="images[]" class="form-control" accept="image/jpeg,image/png,image/webp" multiple>
+                            <label class="form-label">Đường link hình ảnh (tối đa 5 ảnh)</label>
+                            <div class="small text-muted mb-2">Dán URL ảnh công khai, mỗi ô một đường link. Ví dụ: https://...</div>
+                            <div class="row g-2">
+                                @for($imageIndex = 0; $imageIndex < 5; $imageIndex++)
+                                    <div class="col-md-6">
+                                        <input type="url" name="images[]" class="form-control" value="{{ old('images.'.$imageIndex) }}" placeholder="https://example.com/anh-{{ $imageIndex + 1 }}.jpg">
+                                    </div>
+                                @endfor
+                            </div>
                             <div class="form-text">Mỗi ảnh tối đa 3MB.</div>
                         </div>
                         <div class="col-12 d-flex justify-content-end">
@@ -401,7 +413,7 @@
                         <article class="card h-100 border-0 shadow-sm overflow-hidden similar-product-card">
                             <a href="{{ route('shop.detail', $recommended->id) }}" class="text-decoration-none">
                                 @if($recommendedImage)
-                                    <img src="{{ request()->getBaseUrl() . '/storage/' . $recommendedImage }}" class="card-img-top similar-product-image" alt="{{ $recommended->name }}">
+                                    <img src="{{ filter_var($recommendedImage, FILTER_VALIDATE_URL) ? $recommendedImage : request()->getBaseUrl() . '/storage/' . $recommendedImage }}" class="card-img-top similar-product-image" alt="{{ $recommended->name }}">
                                 @else
                                     <div class="similar-product-image d-flex align-items-center justify-content-center text-muted"><i class="fa-regular fa-image fa-2x"></i></div>
                                 @endif
