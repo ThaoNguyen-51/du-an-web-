@@ -143,13 +143,6 @@ class AdminOrderController extends Controller
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    public function invoice(Order $order)
-    {
-        $order->load(['items', 'paymentTransactions', 'statusHistories']);
-
-        return view('admin.orders.invoice', compact('order'));
-    }
-
     /**
      * Cập nhật trạng thái đơn hàng theo flow mới.
      */

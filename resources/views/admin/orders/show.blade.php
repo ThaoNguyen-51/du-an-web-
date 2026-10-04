@@ -57,7 +57,7 @@
         <div class="order-detail-hero mb-4">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div><div class="eyebrow">Order desk</div><h1 class="h3 fw-bold mb-1">Chi tiết đơn hàng #{{ $order->id }}</h1><div class="text-muted small">{{ $order->created_at->format('d/m/Y H:i') }} · {{ $order->customer_name }}</div><div class="small fw-semibold text-danger mt-1">{{ $order->ghn_order_code ?? $order->virtual_tracking_code }}</div></div>
-                <div class="d-flex gap-2"><a href="{{ route('admin.orders.print.one', $order) }}" target="_blank" class="btn btn-danger"><i class="fa-solid fa-print me-2"></i>In đơn</a><a href="{{ route('admin.orders.invoice', $order) }}" target="_blank" class="btn btn-outline-danger"><i class="fa-solid fa-file-invoice me-2"></i>In hóa đơn</a><a href="{{ route('admin.orders.index') }}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-2"></i>Quay lại danh sách</a></div>
+                <div class="d-flex gap-2"><a href="{{ route('admin.orders.print.one', $order) }}" target="_blank" class="btn btn-danger"><i class="fa-solid fa-print me-2"></i>In đơn</a><a href="{{ route('admin.orders.index') }}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-2"></i>Quay lại danh sách</a></div>
             </div>
         </div>
 

@@ -348,7 +348,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/orders/print/bulk', [AdminOrderPrintController::class, 'printBulk'])->name('admin.orders.print.bulk');
         Route::get('/admin/orders/{order}/print', [AdminOrderPrintController::class, 'printOne'])->name('admin.orders.print.one');
         Route::get('/admin/orders/{order}', [AdminOrderController::class, 'show'])->name('admin.orders.show');
-        Route::get('/admin/orders/{order}/invoice', [AdminOrderController::class, 'invoice'])->name('admin.orders.invoice');
         Route::post('/admin/orders/{order}/confirm', [AdminOrderController::class, 'confirm'])->name('admin.orders.confirm');
         Route::post('/admin/orders/{id}/status', [AdminOrderController::class, 'updateStatus'])->name('admin.orders.updateStatus');
         Route::post('/admin/orders/{id}/messages', [AdminOrderController::class, 'sendMessage'])->name('admin.orders.sendMessage');
