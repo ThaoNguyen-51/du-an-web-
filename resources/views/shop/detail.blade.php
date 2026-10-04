@@ -62,6 +62,15 @@
     .text-hc { color: #d71921 !important; }
     .btn-hc { background-color: #d71921; color: #fff; border: none; }
     .btn-hc:hover { background-color: #b51219; color: #fff; }
+    .btn-buy-now {
+        background: #ffb000;
+        color: #1f2937;
+        border: 1px solid #e5a000;
+    }
+    .btn-buy-now:hover {
+        background: #f0a400;
+        color: #111827;
+    }
     .cursor-pointer { cursor: pointer; }
     
     /* Style custom cho biến thể BTU */
@@ -82,6 +91,24 @@
     .btn-check:checked + .variant-card .check-icon {
         display: inline-block !important;
     }
+    .similar-product-card {
+        border-radius: 16px;
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .similar-product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, .1) !important;
+    }
+    .similar-product-image {
+        height: 150px;
+        object-fit: contain;
+        background: linear-gradient(180deg, #fff, #f7f8fb);
+    }
+    .wishlist-toggle.active {
+        background: #d71921;
+        border-color: #d71921;
+        color: #fff;
+    }
 </style>
 
 <div class="container my-4">
@@ -95,23 +122,9 @@
     </nav>
 
     <!-- Thông báo Alert -->
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
-            <i class="fa-solid fa-circle-check me-2"></i>{{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-            <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
     <!-- KHỐI 1: THÔNG TIN MUA HÀNG CHÍNH -->
     <div class="card border-0 shadow-sm p-4 mb-4">
-        <form action="{{ route('cart.add', $airConditioner->id) }}" method="POST">
+        <form action="{{ route('cart.add', $airConditioner->id) }}" method="POST" data-ajax-toast>
             @csrf
             <div class="row g-4">
                 <!-- Cột trái: Ảnh Sản Phẩm -->
@@ -152,7 +165,20 @@
 
                 <!-- Cột phải: Đặt hàng & Biến thể -->
                 <div class="col-lg-7">
-                    <h3 class="fw-bold text-dark mb-2">{{ $airConditioner->name }}</h3>
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <h3 class="fw-bold text-dark mb-2">{{ $airConditioner->name }}</h3>
+                        @auth
+                            @if(auth()->user()->role === 'user')
+                                <button type="button"
+                                    class="btn btn-outline-danger rounded-circle wishlist-toggle"
+                                    data-wishlist-url="{{ route('wishlist.toggle', $airConditioner) }}"
+                                    title="Lưu vào yêu thích"
+                                    aria-label="Lưu vào yêu thích">
+                                    <i class="{{ $isWishlisted ? 'fa-solid' : 'fa-regular' }} fa-heart"></i>
+                                </button>
+                            @endif
+                        @endauth
+                    </div>
                     <p class="text-muted small mb-3">
                         Thương hiệu: <span class="badge bg-secondary px-2 py-1">{{ $airConditioner->brand }}</span>
                     </p>
@@ -203,9 +229,18 @@
                     </div>
 
                     <!-- Nút Mua Hàng -->
-                    <button type="submit" class="btn btn-hc btn-lg w-100 py-3 fw-bold text-uppercase shadow-sm">
-                        <i class="fa-solid fa-cart-plus me-2"></i> THÊM VÀO GIỎ HÀNG
-                    </button>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-hc btn-lg w-100 py-3 fw-bold text-uppercase shadow-sm">
+                                <i class="fa-solid fa-cart-plus me-2"></i> THÊM VÀO GIỎ HÀNG
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="submit" name="buy_now" value="1" class="btn btn-buy-now btn-lg w-100 py-3 fw-bold text-uppercase shadow-sm">
+                                <i class="fa-solid fa-bolt me-2"></i> MUA NGAY
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </form>
@@ -273,6 +308,15 @@
                         @endfor
                     </div>
                     <p class="mb-2 text-break">{{ $review->comment }}</p>
+                    @if(!empty($review->images))
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            @foreach($review->images as $reviewImage)
+                                <a href="{{ asset('storage/'.$reviewImage) }}" target="_blank" rel="noopener">
+                                    <img src="{{ asset('storage/'.$reviewImage) }}" alt="Ảnh đánh giá" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;">
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
                     @if($review->admin_reply)
                         <div class="bg-light border-start border-3 border-danger rounded p-3">
                             <strong class="small text-danger">Phản hồi từ cửa hàng</strong>
@@ -284,8 +328,8 @@
                 <p class="text-muted mb-0">Sản phẩm chưa có đánh giá.</p>
             @endforelse
 
-            @if(auth()->user()->role === 'customer' && $eligibleReviewOrders->isNotEmpty())
-                <form action="{{ route('product-reviews.store', $airConditioner) }}" method="POST" class="mt-4">
+            @if(auth()->user()->role === 'user' && $eligibleReviewOrders->isNotEmpty())
+                <form action="{{ route('product-reviews.store', $airConditioner) }}" method="POST" enctype="multipart/form-data" class="mt-4">
                     @csrf
                     <h6 class="fw-bold mb-3">Viết đánh giá</h6>
                     <div class="row g-3">
@@ -311,12 +355,17 @@
                             <label for="review-comment" class="form-label">Nhận xét</label>
                             <textarea id="review-comment" name="comment" class="form-control" rows="4" minlength="5" maxlength="2000" required>{{ old('comment') }}</textarea>
                         </div>
+                        <div class="col-12">
+                            <label for="review-images" class="form-label">Hình ảnh (tối đa 5 ảnh)</label>
+                            <input id="review-images" type="file" name="images[]" class="form-control" accept="image/jpeg,image/png,image/webp" multiple>
+                            <div class="form-text">Mỗi ảnh tối đa 3MB.</div>
+                        </div>
                         <div class="col-12 d-flex justify-content-end">
                             <button type="submit" class="btn btn-hc"><i class="fa-solid fa-paper-plane me-2"></i>Gửi đánh giá</button>
                         </div>
                     </div>
                 </form>
-            @elseif(auth()->user()->role === 'customer' && $incompleteReviewOrders->isNotEmpty())
+            @elseif(auth()->user()->role === 'user' && $incompleteReviewOrders->isNotEmpty())
                 <div class="alert alert-info border-0 mt-4 mb-0">
                     <strong>Bạn có đơn hàng sản phẩm này đang được xử lý.</strong>
                     <span> Bạn có thể gửi đánh giá sau khi đơn chuyển sang trạng thái Đã hoàn thành.</span>
@@ -326,11 +375,59 @@
                         @endforeach
                     </ul>
                 </div>
-            @elseif(auth()->user()->role === 'customer')
+            @elseif(auth()->user()->role === 'user')
                 <p class="small text-muted border-top pt-3 mt-3 mb-0">Chỉ khách hàng có đơn hàng đã hoàn thành mới được gửi đánh giá. Bạn vẫn có thể đọc các đánh giá bên trên.</p>
             @endif
         </div>
     </section>
+
+    @if($recommendedProducts->isNotEmpty())
+        <section class="mt-5" aria-labelledby="similar-products-title">
+            <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+                <div>
+                    <div class="small text-danger fw-bold text-uppercase">Có thể bạn quan tâm</div>
+                    <h2 id="similar-products-title" class="h4 fw-bold mb-0">Sản phẩm có thông số tương tự</h2>
+                </div>
+                <a href="{{ route('shop.index') }}" class="btn btn-sm btn-outline-danger">Xem thêm sản phẩm</a>
+            </div>
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
+                @foreach($recommendedProducts as $recommended)
+                    @php
+                        $recommendedVariant = $recommended->variants->first();
+                        $recommendedSpecs = is_array($recommendedVariant?->specifications) ? $recommendedVariant->specifications : [];
+                        $recommendedImage = $recommended->primary_image_path ?? $recommended->image;
+                    @endphp
+                    <div class="col">
+                        <article class="card h-100 border-0 shadow-sm overflow-hidden similar-product-card">
+                            <a href="{{ route('shop.detail', $recommended->id) }}" class="text-decoration-none">
+                                @if($recommendedImage)
+                                    <img src="{{ request()->getBaseUrl() . '/storage/' . $recommendedImage }}" class="card-img-top similar-product-image" alt="{{ $recommended->name }}">
+                                @else
+                                    <div class="similar-product-image d-flex align-items-center justify-content-center text-muted"><i class="fa-regular fa-image fa-2x"></i></div>
+                                @endif
+                            </a>
+                            <div class="card-body d-flex flex-column p-3">
+                                <span class="badge rounded-pill text-bg-light border text-danger align-self-start mb-2">{{ $recommended->brand ?: 'Điều hòa' }}</span>
+                                <h3 class="h6 fw-bold mb-2">
+                                    <a href="{{ route('shop.detail', $recommended->id) }}" class="text-dark text-decoration-none">{{ $recommended->name }}</a>
+                                </h3>
+                                <div class="small text-muted mb-2">
+                                    <div><i class="fa-solid fa-bolt text-danger me-1"></i>{{ $recommendedVariant?->capacity_name ?? 'Chưa cập nhật công suất' }}</div>
+                                    @if(!empty($recommendedSpecs['machine_type']))
+                                        <div><i class="fa-solid fa-snowflake text-danger me-1"></i>{{ $recommendedSpecs['machine_type'] }}</div>
+                                    @endif
+                                </div>
+                                <div class="mt-auto">
+                                    <div class="fw-bold text-danger mb-2">{{ number_format((float) ($recommendedVariant?->price ?? $recommended->price), 0, ',', '.') }} đ</div>
+                                    <a href="{{ route('shop.detail', $recommended->id) }}" class="btn btn-outline-danger btn-sm w-100">Xem chi tiết</a>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
 </div>
 
 <script>
@@ -462,6 +559,38 @@
                 showGalleryImage(currentGalleryIndex + Number(this.dataset.direction));
             });
         });
+
+        const wishlistButton = document.querySelector('.wishlist-toggle');
+        if (wishlistButton) {
+            wishlistButton.addEventListener('click', function () {
+                const token = document.querySelector('input[name="_token"]')?.value;
+                wishlistButton.disabled = true;
+                fetch(wishlistButton.dataset.wishlistUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': token,
+                        'Accept': 'application/json',
+                    },
+                }).then(async response => {
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Không thể cập nhật yêu thích.');
+                    const icon = wishlistButton.querySelector('i');
+                    icon.classList.toggle('fa-solid', data.wishlisted);
+                    icon.classList.toggle('fa-regular', !data.wishlisted);
+                    wishlistButton.classList.toggle('active', data.wishlisted);
+                    wishlistButton.setAttribute('title', data.wishlisted ? 'Bỏ yêu thích' : 'Lưu vào yêu thích');
+                    wishlistButton.setAttribute('aria-label', data.wishlisted ? 'Bỏ yêu thích' : 'Lưu vào yêu thích');
+                    if (window.shopShowToast) window.shopShowToast(data.message);
+                })
+                  .catch(() => {
+                      wishlistButton.disabled = false;
+                      if (window.shopShowToast) window.shopShowToast('Không thể cập nhật danh sách yêu thích. Vui lòng thử lại.', 'error');
+                  })
+                  .finally(() => {
+                      wishlistButton.disabled = false;
+                  });
+            });
+        }
     });
 </script>
 @endsection

@@ -1,7 +1,12 @@
 @extends('layouts.shop')
 
 @section('content')
-<div class="container my-4">
+<style>
+    .product-form-page { --form-ink: #172033; --form-line: #e7ebf2; }
+    .product-form-section { scroll-margin-top: 155px; }
+    .required-missing { border-color: #e21b23 !important; box-shadow: 0 0 0 .2rem rgba(226,27,35,.1) !important; }
+</style>
+<div class="container my-4 product-form-page">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="fw-bold text-dark mb-0"><i class="fa-solid fa-pen-to-square me-2 text-primary"></i>Cập Nhật Điều Hòa</h3>
         <a href="{{ route('air_conditioners.index') }}" class="btn btn-outline-secondary btn-sm">
@@ -19,12 +24,11 @@
         </div>
     @endif
 
-    <form action="{{ route('air_conditioners.update', $airConditioner->id) }}" method="POST" enctype="multipart/form-data">
+    <form action="{{ route('air_conditioners.update', $airConditioner->id) }}" method="POST" enctype="multipart/form-data" id="product-form">
         @csrf
         @method('PUT')
-        
         <!-- 1. Thông tin chung -->
-        <div class="card border-0 shadow-sm mb-4">
+        <div class="card border-0 shadow-sm mb-4 product-form-section" id="basic-section">
             <div class="card-header bg-white fw-bold py-3 text-primary border-bottom">
                 <i class="fa-solid fa-circle-info me-1"></i> 1. Thông tin sản phẩm chung
             </div>
@@ -61,7 +65,7 @@
                         </div>
                     </div>
 
-                    <div class="col-md-5">
+                    <div class="col-md-5 product-form-section" id="image-section">
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Ảnh sản phẩm (có thể chọn nhiều ảnh)</label>
                             <div class="border rounded p-3 text-center bg-light mb-2">
@@ -101,7 +105,7 @@
         </div>
 
         <!-- 2. Danh sách Biến thể BTU & Thông số kỹ thuật chi tiết -->
-        <div class="card border-0 shadow-sm mb-4">
+        <div class="card border-0 shadow-sm mb-4 product-form-section" id="variant-section">
             <div class="card-header bg-white d-flex justify-content-between align-items-center fw-bold py-3 text-primary border-bottom">
                 <span><i class="fa-solid fa-layer-group me-1"></i> 2. Danh sách phân loại công suất (Biến thể BTU)</span>
                 <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" id="add-variant">
@@ -120,7 +124,7 @@
                         </div>
 
                         <!-- Thông tin cơ bản biến thể -->
-                        <div class="row g-2 mb-3">
+                        <div class="row g-2 mb-3" id="variant-fields">
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold">Tên công suất *</label>
                                 <input type="text" name="variants[{{ $index }}][capacity_name]" class="form-control" value="{{ $variant->capacity_name }}" required>
@@ -140,7 +144,7 @@
                         </div>
 
                         <!-- Accordion Nhập Thông Số Kỹ Thuật Chi Tiết -->
-                        <div class="accordion" id="accordionSpec{{ $index }}">
+                        <div class="accordion" id="{{ $index === 0 ? 'spec-section' : 'accordionSpec' . $index }}">
                             <div class="accordion-item border-0">
                                 <h2 class="accordion-header">
                                     <button class="accordion-button collapsed bg-white border fw-bold text-secondary rounded py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSpec{{ $index }}">
@@ -251,6 +255,21 @@
 </div>
 
 <script>
+    (() => {
+        const form = document.getElementById('product-form');
+        let isDirty = false;
+
+        form.addEventListener('input', () => {
+            isDirty = true;
+            form.querySelectorAll('[required]').forEach((field) => field.classList.toggle('required-missing', !field.checkValidity()));
+        });
+        form.addEventListener('change', () => { isDirty = true; });
+        form.addEventListener('submit', () => { isDirty = false; });
+        window.addEventListener('beforeunload', (event) => {
+            if (isDirty) { event.preventDefault(); event.returnValue = ''; }
+        });
+    })();
+
     const imageInput = document.getElementById('image-input');
     let selectedFiles = [];
     imageInput.addEventListener('change', function(e) {

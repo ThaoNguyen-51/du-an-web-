@@ -193,6 +193,25 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'address_id' => 'nullable|integer',
+        ]);
+        if ($request->filled('address_id')) {
+            $savedAddress = auth()->user()->addresses()->findOrFail($request->integer('address_id'));
+            $request->merge([
+                'customer_name' => $savedAddress->recipient_name,
+                'customer_phone' => $savedAddress->phone,
+                'customer_address' => collect([
+                    $savedAddress->address,
+                    $savedAddress->ward,
+                    $savedAddress->district,
+                    $savedAddress->province,
+                ])->filter()->implode(', '),
+                'to_district_id' => $savedAddress->district_id,
+                'to_ward_code' => $savedAddress->ward_code,
+            ]);
+        }
+
+        $request->validate([
             'customer_name'    => 'required|string|max:255',
             'customer_phone'   => 'required|string|max:20',
             'customer_address' => 'required|string|max:255',
@@ -202,6 +221,7 @@ class OrderController extends Controller
             'to_ward_code'     => 'nullable|string',
             'shipping_fee'     => 'nullable|numeric',
             'coupon_code'      => 'nullable|string|max:40',
+            'address_id'       => 'nullable|integer',
         ]);
 
         $cart = session()->get('cart', []);
@@ -306,6 +326,7 @@ class OrderController extends Controller
             }
 
             DB::commit();
+            session()->forget('buy_now_key');
 
             if (Order::isOnlinePaymentMethod($request->payment_method)) {
                 return redirect()->route('payment.momo.start', $order);

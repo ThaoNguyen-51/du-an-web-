@@ -203,6 +203,15 @@
                                                                     <span class="text-success fw-semibold"><i class="fa-solid fa-circle-check me-1"></i>Đã đánh giá</span>
                                                                     <span class="text-warning ms-1">{{ str_repeat('★', $item->purchaseReview->rating) }}</span>
                                                                     <p class="mb-1 mt-1 text-break">{{ $item->purchaseReview->comment }}</p>
+                                                                    @if(!empty($item->purchaseReview->images))
+                                                                        <div class="d-flex flex-wrap gap-2 mt-2">
+                                                                            @foreach($item->purchaseReview->images as $reviewImage)
+                                                                                <a href="{{ asset('storage/'.$reviewImage) }}" target="_blank" rel="noopener">
+                                                                                    <img src="{{ asset('storage/'.$reviewImage) }}" alt="Ảnh đánh giá" class="rounded border" style="width:58px;height:58px;object-fit:cover;">
+                                                                                </a>
+                                                                            @endforeach
+                                                                        </div>
+                                                                    @endif
                                                                     @if($item->purchaseReview->admin_reply)
                                                                         <div class="text-muted border-start border-2 border-danger ps-2 mt-2">
                                                                             <strong class="text-danger">Shop phản hồi:</strong> {{ $item->purchaseReview->admin_reply }}

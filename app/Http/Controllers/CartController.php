@@ -15,8 +15,9 @@ class CartController extends Controller
     {
         // Lấy danh sách sản phẩm trong session cart, mặc định là mảng rỗng
         $cart = session()->get('cart', []);
+        $savedAddresses = auth()->user()->addresses()->orderByDesc('is_default')->latest()->get();
         
-        return view('shop.cart', compact('cart'));
+        return view('shop.cart', compact('cart', 'savedAddresses'));
     }
 
     /**
@@ -64,6 +65,21 @@ class CartController extends Controller
 
         // Lưu lại vào Session
         session()->put('cart', $cart);
+
+        if ($request->boolean('buy_now')) {
+            session()->put('buy_now_key', $cartKey);
+
+            return redirect()->route('user.cart.index');
+        }
+
+        session()->forget('buy_now_key');
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Đã thêm sản phẩm vào giỏ hàng thành công!',
+                'cart_count' => collect($cart)->sum('quantity'),
+            ]);
+        }
 
         return redirect()->route('user.cart.index')->with('success', 'Đã thêm sản phẩm vào giỏ hàng thành công!');
     }

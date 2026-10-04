@@ -12,9 +12,15 @@ use App\Http\Controllers\AdminStaffController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\AdminCouponController;
 use App\Http\Controllers\AdminReportController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminActivityLogController;
+use App\Http\Controllers\AdminNotificationController;
+use App\Http\Controllers\AdminOrderPrintController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\MomoController;
 use App\Http\Controllers\ProductReviewController;
+use App\Http\Controllers\CustomerAccountController;
+use App\Http\Controllers\WishlistController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use App\Models\Order;
@@ -51,6 +57,30 @@ Route::get('/', function (Request $request) {
         $query->where('brand', $request->brand);
     }
 
+    $minPrice = is_numeric($request->input('min_price')) ? (float) $request->input('min_price') : null;
+    $maxPrice = is_numeric($request->input('max_price')) ? (float) $request->input('max_price') : null;
+
+    if ($minPrice !== null) {
+        $query->where(function ($productQuery) use ($minPrice) {
+            $productQuery->where('price', '>=', $minPrice)
+                ->orWhereHas('variants', fn ($variantQuery) => $variantQuery->where('price', '>=', $minPrice));
+        });
+    }
+
+    if ($maxPrice !== null) {
+        $query->where(function ($productQuery) use ($maxPrice) {
+            $productQuery->where('price', '<=', $maxPrice)
+                ->orWhereHas('variants', fn ($variantQuery) => $variantQuery->where('price', '<=', $maxPrice));
+        });
+    }
+
+    match ($request->input('sort')) {
+        'price_asc' => $query->orderBy('price'),
+        'price_desc' => $query->orderByDesc('price'),
+        'name_asc' => $query->orderBy('name'),
+        default => $query->latest(),
+    };
+
     $airConditioners = $query->get();
     $brands = AirConditioner::query()
         ->whereNotNull('brand')
@@ -62,6 +92,67 @@ Route::get('/', function (Request $request) {
     return view('shop.index', compact('airConditioners', 'brands'));
 })->name('shop.index');
 
+Route::get('/compare', function (Request $request) {
+    $ids = collect($request->session()->get('compare_products', []))
+        ->map(fn ($id) => (int) $id)
+        ->filter()
+        ->unique()
+        ->take(4);
+    $products = AirConditioner::with('variants')->whereIn('id', $ids)->get()
+        ->sortBy(fn ($product) => $ids->search($product->id))
+        ->values();
+    $specKeys = $products->flatMap(fn ($product) => $product->variants->flatMap(
+        fn ($variant) => array_keys(is_array($variant->specifications) ? $variant->specifications : [])
+    ))->unique()->values();
+
+    return view('shop.compare', compact('products', 'specKeys'));
+})->name('shop.compare');
+
+Route::post('/compare/{id}', function (Request $request, int $id) {
+    abort_unless(AirConditioner::whereKey($id)->exists(), 404);
+
+    $ids = collect($request->session()->get('compare_products', []))
+        ->map(fn ($item) => (int) $item)
+        ->filter()
+        ->unique();
+
+    if (!$ids->contains($id) && $ids->count() >= 4) {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Bạn chỉ có thể so sánh tối đa 4 sản phẩm.'], 422);
+        }
+
+        return back()->with('error', 'Bạn chỉ có thể so sánh tối đa 4 sản phẩm.');
+    }
+
+    $request->session()->put('compare_products', $ids->push($id)->values()->all());
+
+    if ($request->expectsJson()) {
+        return response()->json([
+            'message' => 'Đã thêm sản phẩm vào danh sách so sánh.',
+            'compare_count' => $ids->count() + 1,
+        ]);
+    }
+
+    return back()->with('success', 'Đã thêm sản phẩm vào danh sách so sánh.');
+})->name('shop.compare.add');
+
+Route::delete('/compare/{id}', function (Request $request, int $id) {
+    $ids = collect($request->session()->get('compare_products', []))
+        ->reject(fn ($item) => (int) $item === $id)
+        ->values()
+        ->all();
+    $request->session()->put('compare_products', $ids);
+
+    if ($request->expectsJson()) {
+        return response()->json([
+            'message' => 'Đã xóa sản phẩm khỏi danh sách so sánh.',
+            'compare_count' => count($ids),
+        ]);
+    }
+
+    return back()->with('success', 'Đã xóa sản phẩm khỏi danh sách so sánh.');
+})->name('shop.compare.remove');
+
 // Đăng ký & Đăng nhập
 Route::middleware('guest')->group(function () {
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
@@ -69,6 +160,10 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+    Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
+    Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->middleware('throttle:6,1')->name('password.email');
+    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 });
 
 // Đăng xuất
@@ -92,10 +187,52 @@ Route::middleware('auth')->group(function () {
     // Chi tiết sản phẩm
     Route::get('/products/{id}', function ($id) {
         $airConditioner = AirConditioner::with(['variants', 'images', 'reviews.user', 'reviews.repliedBy'])->findOrFail($id);
+        $selectedVariant = $airConditioner->variants->first();
+        $selectedSpecs = is_array($selectedVariant?->specifications) ? $selectedVariant->specifications : [];
+        $selectedType = strtolower(trim((string) ($selectedSpecs['machine_type'] ?? $selectedSpecs['type'] ?? '')));
+        $selectedCapacity = strtolower(trim((string) ($selectedVariant?->capacity_name ?? '')));
+        $selectedCapacityNumber = (int) preg_replace('/\D+/', '', $selectedCapacity);
+        $selectedBrand = strtolower(trim((string) $airConditioner->brand));
+
+        $recommendedProducts = AirConditioner::with(['variants', 'images'])
+            ->where('id', '!=', $airConditioner->id)
+            ->get()
+            ->map(function ($product) use ($selectedBrand, $selectedType, $selectedCapacity, $selectedCapacityNumber) {
+                $variant = $product->variants->first();
+                $specs = is_array($variant?->specifications) ? $variant->specifications : [];
+                $type = strtolower(trim((string) ($specs['machine_type'] ?? $specs['type'] ?? '')));
+                $capacity = strtolower(trim((string) ($variant?->capacity_name ?? '')));
+                $capacityNumber = (int) preg_replace('/\D+/', '', $capacity);
+                $score = 0;
+
+                if ($selectedBrand !== '' && strtolower(trim((string) $product->brand)) === $selectedBrand) {
+                    $score += 4;
+                }
+                if ($selectedType !== '' && $type !== '' && $selectedType === $type) {
+                    $score += 3;
+                }
+                if ($selectedCapacity !== '' && $capacity !== '' && $selectedCapacity === $capacity) {
+                    $score += 3;
+                }
+                if ($selectedCapacityNumber > 0 && $capacityNumber > 0 && abs($selectedCapacityNumber - $capacityNumber) <= 3000) {
+                    $score += 2;
+                }
+                if ($variant && $variant->price !== null) {
+                    $score += 1;
+                }
+
+                $product->recommendation_score = $score;
+                return $product;
+            })
+            ->sortByDesc('recommendation_score')
+            ->take(4)
+            ->values();
         $eligibleReviewOrders = collect();
         $incompleteReviewOrders = collect();
+        $isWishlisted = auth()->user()->role === 'user'
+            && auth()->user()->wishlistItems()->where('air_conditioner_id', $airConditioner->id)->exists();
 
-        if (auth()->user()->role === 'customer') {
+        if (auth()->user()->role === 'user') {
             $matchingProduct = function ($query) use ($airConditioner) {
                     $query->where('air_conditioner_id', $airConditioner->id)
                         ->orWhere(function ($legacyQuery) use ($airConditioner) {
@@ -118,7 +255,7 @@ Route::middleware('auth')->group(function () {
                 ->get(['id', 'created_at', 'status']);
         }
 
-        return view('shop.detail', compact('airConditioner', 'eligibleReviewOrders', 'incompleteReviewOrders'));
+        return view('shop.detail', compact('airConditioner', 'recommendedProducts', 'eligibleReviewOrders', 'incompleteReviewOrders', 'isWishlisted'));
     })->name('shop.detail');
 
 
@@ -126,7 +263,16 @@ Route::middleware('auth')->group(function () {
     // 4. XÁC THỰC EMAIL (VERIFIED)
     // ==============================
     Route::middleware(['verified', 'customer'])->group(function () {
-        
+        Route::get('/account', [CustomerAccountController::class, 'index'])->name('account.index');
+        Route::put('/account/profile', [CustomerAccountController::class, 'updateProfile'])->name('account.profile.update');
+        Route::put('/account/password', [CustomerAccountController::class, 'updatePassword'])->name('account.password.update');
+        Route::post('/account/addresses', [CustomerAccountController::class, 'storeAddress'])->name('account.addresses.store');
+        Route::put('/account/addresses/{address}', [CustomerAccountController::class, 'updateAddress'])->name('account.addresses.update');
+        Route::delete('/account/addresses/{address}', [CustomerAccountController::class, 'destroyAddress'])->name('account.addresses.destroy');
+        Route::post('/account/addresses/{address}/default', [CustomerAccountController::class, 'setDefaultAddress'])->name('account.addresses.default');
+        Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
+        Route::post('/wishlist/{product}/toggle', [WishlistController::class, 'toggle'])->name('wishlist.toggle');
+
         // Quản lý Giỏ hàng
         Route::get('/cart', [CartController::class, 'index'])->name('user.cart.index');
         Route::post('/add-to-cart/{id}', [CartController::class, 'addToCart'])->name('cart.add');
@@ -151,6 +297,9 @@ Route::middleware('auth')->group(function () {
 
 
     Route::middleware('admin_or_staff')->group(function () {
+        Route::get('/admin/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
+        Route::get('/admin/activity-logs', [AdminActivityLogController::class, 'index'])->name('admin.activity-logs.index');
+        Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications');
         Route::get('/admin/chat', [ChatController::class, 'index'])->name('admin.chat.index');
         Route::post('/admin/chat/messages', [ChatController::class, 'send'])->name('admin.chat.send');
         Route::get('/admin/coupons', [AdminCouponController::class, 'index'])->name('admin.coupons.index');
@@ -167,7 +316,20 @@ Route::middleware('auth')->group(function () {
         Route::delete('/air_conditioners/{air_conditioner}', [AirConditionerController::class, 'destroy'])->name('air_conditioners.destroy');
 
         Route::get('/admin/orders', [AdminOrderController::class, 'index'])->name('admin.orders.index');
+        Route::get('/admin/orders/export/csv', [AdminOrderController::class, 'exportCsv'])->name('admin.orders.export');
+        Route::get('/admin/orders/print', [AdminOrderPrintController::class, 'index'])->name('admin.orders.print.index');
+        Route::get('/admin/orders/print/date', [AdminOrderPrintController::class, 'index'])->name('admin.orders.print.date');
+        Route::get('/admin/orders/print/unprinted', function (Request $request) {
+            return app(AdminOrderPrintController::class)->index($request->merge(['printed' => 'unprinted']));
+        })->name('admin.orders.print.unprinted');
+        Route::get('/admin/orders/print/printed', function (Request $request) {
+            return app(AdminOrderPrintController::class)->index($request->merge(['printed' => 'printed']));
+        })->name('admin.orders.print.printed');
+        Route::post('/admin/orders/print/bulk', [AdminOrderPrintController::class, 'printBulk'])->name('admin.orders.print.bulk');
+        Route::get('/admin/orders/{order}/print', [AdminOrderPrintController::class, 'printOne'])->name('admin.orders.print.one');
         Route::get('/admin/orders/{order}', [AdminOrderController::class, 'show'])->name('admin.orders.show');
+        Route::get('/admin/orders/{order}/invoice', [AdminOrderController::class, 'invoice'])->name('admin.orders.invoice');
+        Route::post('/admin/orders/{order}/confirm', [AdminOrderController::class, 'confirm'])->name('admin.orders.confirm');
         Route::post('/admin/orders/{id}/status', [AdminOrderController::class, 'updateStatus'])->name('admin.orders.updateStatus');
         Route::post('/admin/orders/{id}/messages', [AdminOrderController::class, 'sendMessage'])->name('admin.orders.sendMessage');
         Route::post('/admin/product-reviews/{review}/reply', [ProductReviewController::class, 'reply'])->name('admin.product-reviews.reply');

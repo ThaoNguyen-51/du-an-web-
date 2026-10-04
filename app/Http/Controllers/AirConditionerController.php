@@ -7,6 +7,7 @@ use App\Models\AirConditionerVariant;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use App\Services\AdminActivityLogger;
 
 class AirConditionerController extends Controller
 {
@@ -67,9 +68,35 @@ class AirConditionerController extends Controller
             $query->where('brand', $request->brand);
         }
 
-        $airConditioners = $query->latest()->get();
+        if ($request->input('stock') === 'low') {
+            $query->whereHas('variants', fn ($variantQuery) => $variantQuery->whereBetween('stock', [1, 5]));
+            $query->with(['variants' => fn ($variantQuery) => $variantQuery->whereBetween('stock', [1, 5])]);
+        } elseif ($request->input('stock') === 'out') {
+            $query->whereHas('variants', fn ($variantQuery) => $variantQuery->where('stock', '<=', 0));
+            $query->with(['variants' => fn ($variantQuery) => $variantQuery->where('stock', '<=', 0)]);
+        } elseif ($request->input('stock') === 'available') {
+            $query->whereHas('variants', fn ($variantQuery) => $variantQuery->where('stock', '>', 5));
+        }
 
-        return view('air_conditioners.index', compact('airConditioners'));
+        match ($request->input('sort')) {
+            'price_asc' => $query->orderBy('price'),
+            'price_desc' => $query->orderByDesc('price'),
+            'name_asc' => $query->orderBy('name'),
+            'stock_asc' => $query->withMin('variants', 'stock')->orderBy('variants_min_stock'),
+            default => $query->latest(),
+        };
+
+        $airConditioners = $query->get();
+        $brands = AirConditioner::query()
+            ->whereNotNull('brand')
+            ->whereRaw("TRIM(brand) <> ''")
+            ->distinct()
+            ->orderBy('brand')
+            ->pluck('brand');
+        $lowStockCount = AirConditionerVariant::whereBetween('stock', [1, 5])->count();
+        $outOfStockCount = AirConditionerVariant::where('stock', '<=', 0)->count();
+
+        return view('air_conditioners.index', compact('airConditioners', 'brands', 'lowStockCount', 'outOfStockCount'));
     }
 
     public function create()
@@ -77,7 +104,7 @@ class AirConditionerController extends Controller
         return view('air_conditioners.create');
     }
 
-    public function store(Request $request)
+    public function store(Request $request, AdminActivityLogger $activityLogger)
     {
         $request->validate([
             'name' => 'required|string|max:255',
@@ -108,6 +135,7 @@ class AirConditionerController extends Controller
                 'specifications' => $variantData['specifications'] ?? [],
             ]);
         }
+        $activityLogger->record('product_created', "Tạo sản phẩm {$airConditioner->name}", $airConditioner);
 
         return redirect()->route('air_conditioners.index')->with('success', 'Thêm sản phẩm thành công!');
     }
@@ -123,9 +151,11 @@ class AirConditionerController extends Controller
         return view('air_conditioners.edit', compact('airConditioner'));
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, AdminActivityLogger $activityLogger)
     {
-        $airConditioner = AirConditioner::findOrFail($id);
+        $airConditioner = AirConditioner::with('variants')->findOrFail($id);
+        $beforeVariants = $airConditioner->variants->keyBy('id')->map(fn ($variant) => $variant->only(['price', 'stock']));
+        $beforeProductPrice = (string) $airConditioner->price;
 
         $request->validate([
             'name'                  => 'required|string|max:255',
@@ -235,12 +265,41 @@ class AirConditionerController extends Controller
             $airConditioner->variants()->delete();
         }
 
+        $airConditioner->load('variants');
+        $activityLogger->record('product_updated', "Sửa sản phẩm {$airConditioner->name}", $airConditioner);
+        $priceChanges = [];
+        $stockChanges = [];
+        foreach ($airConditioner->variants as $variant) {
+            $before = $beforeVariants->get($variant->id);
+            if (!$before) {
+                continue;
+            }
+            if ((string) $before['price'] !== (string) $variant->price) {
+                $priceChanges[$variant->capacity_name] = [$before['price'], $variant->price];
+            }
+            if ((int) $before['stock'] !== (int) $variant->stock) {
+                $stockChanges[$variant->capacity_name] = [$before['stock'], $variant->stock];
+            }
+        }
+        if ($priceChanges) {
+            $activityLogger->record('price_changed', "Sửa giá sản phẩm {$airConditioner->name}", $airConditioner, ['changes' => $priceChanges]);
+        }
+        if ($beforeProductPrice !== (string) $airConditioner->price && !$priceChanges) {
+            $activityLogger->record('price_changed', "Sửa giá sản phẩm {$airConditioner->name}", $airConditioner, [
+                'product_price' => [$beforeProductPrice, (string) $airConditioner->price],
+            ]);
+        }
+        if ($stockChanges) {
+            $activityLogger->record('stock_changed', "Sửa tồn kho sản phẩm {$airConditioner->name}", $airConditioner, ['changes' => $stockChanges]);
+        }
+
         return redirect()->route('air_conditioners.index')->with('success', 'Cập nhật điều hòa thành công!');
     }
 
-    public function destroy($id)
+    public function destroy($id, AdminActivityLogger $activityLogger)
     {
         $airConditioner = AirConditioner::findOrFail($id);
+        $activityLogger->record('product_deleted', "Xóa sản phẩm {$airConditioner->name}", $airConditioner);
 
         if ($airConditioner->image) {
             Storage::disk('public')->delete($airConditioner->image);

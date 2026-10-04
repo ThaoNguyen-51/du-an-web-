@@ -21,6 +21,10 @@
     .chat-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
     .chat-contact-name { font-size: .88rem; font-weight: 700; color: var(--chat-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .chat-contact-meta { color: var(--chat-muted); font-size: .76rem; margin-top: 3px; }
+    .chat-unread-badge { min-width: 20px; padding: 3px 6px; border-radius: 999px; background: var(--chat-red); color: #fff; font-size: .68rem; font-weight: 700; text-align: center; }
+    .chat-filter { display:flex; gap:6px; margin-top:10px; }
+    .chat-filter a { flex:1; padding:6px 7px; border:1px solid #e2e5e9; border-radius:7px; color:var(--chat-muted); font-size:.72rem; text-align:center; text-decoration:none; }
+    .chat-filter a.active, .chat-filter a:hover { color:var(--chat-red); border-color:#f2a18f; background:#fff5f2; }
     .chat-main { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
     .chat-top { padding: 15px 20px; min-height: 68px; border-bottom: 1px solid var(--chat-line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .chat-top-title { font-weight: 750; color: var(--chat-ink); }
@@ -92,6 +96,10 @@
                                 <input type="search" name="keyword" value="{{ $keyword }}" class="form-control border-start-0" placeholder="Tên, mã đơn, tin nhắn..." aria-label="Tìm khách hàng">
                             </div>
                         </form>
+                        <div class="chat-filter">
+                            <a class="{{ !$unreadOnly ? 'active' : '' }}" href="{{ route('admin.chat.index', $keyword ? ['keyword' => $keyword] : []) }}">Tất cả</a>
+                            <a class="{{ $unreadOnly ? 'active' : '' }}" href="{{ route('admin.chat.index', array_filter(['keyword' => $keyword ?: null, 'unread' => 1])) }}">Chưa đọc</a>
+                        </div>
                     @else
                         <div class="small text-muted">Tư vấn và hỗ trợ</div>
                     @endif
@@ -99,9 +107,10 @@
                 <div class="chat-list">
                     @if($isAdmin)
                         @forelse($customers as $customer)
-                            <a class="chat-contact {{ $selectedCustomer?->id === $customer->id ? 'active' : '' }}" href="{{ route('admin.chat.index', array_filter(['customer_id' => $customer->id, 'keyword' => $keyword ?: null])) }}">
+                            <a class="chat-contact {{ $selectedCustomer?->id === $customer->id ? 'active' : '' }}" href="{{ route('admin.chat.index', array_filter(['customer_id' => $customer->id, 'keyword' => $keyword ?: null, 'unread' => $unreadOnly ? 1 : null])) }}">
                                 <span class="chat-avatar">{{ mb_substr($customer->name, 0, 1) }}</span>
-                                <span class="chat-contact-copy min-w-0"><span class="chat-contact-name d-block">{{ $customer->name }}</span><span class="chat-contact-meta d-block">Mở cuộc trò chuyện</span></span>
+                                <span class="chat-contact-copy min-w-0 flex-grow-1"><span class="chat-contact-name d-block">{{ $customer->name }}</span><span class="chat-contact-meta d-block">Mở cuộc trò chuyện</span></span>
+                                @if($unreadCustomerIds->contains($customer->id))<span class="chat-unread-badge">Mới</span>@endif
                             </a>
                         @empty
                             <div class="p-3 small text-muted">Không tìm thấy khách hàng phù hợp.</div>
@@ -217,11 +226,12 @@
                             </div>
                         </form>
                         @forelse($orders as $order)
-                            <a href="{{ route('admin.chat.index', array_filter(['customer_id' => $selectedCustomer->id, 'order_id' => $order->id, 'order_search' => $orderSearch ?: null, 'keyword' => $keyword ?: null])) }}" class="chat-order-card {{ $selectedOrder?->id === $order->id ? 'active' : '' }}">
+                            <div class="chat-order-card {{ $selectedOrder?->id === $order->id ? 'active' : '' }}">
                                 <strong>Đơn #{{ $order->id }}</strong>
                                 <small>{{ $order->customer_name }} · {{ $order->customer_phone }}</small>
                                 <small>{{ $order->status_label }} · {{ number_format((float) $order->total_amount, 0, ',', '.') }} đ</small>
-                            </a>
+                                <div class="d-flex gap-2 mt-1 small"><a href="{{ route('admin.chat.index', array_filter(['customer_id' => $selectedCustomer->id, 'order_id' => $order->id, 'order_search' => $orderSearch ?: null, 'keyword' => $keyword ?: null, 'unread' => $unreadOnly ? 1 : null])) }}" class="text-danger">Trao đổi</a><a href="{{ route('admin.orders.show', $order->id) }}" target="_blank" class="text-danger">Xem chi tiết</a></div>
+                            </div>
                         @empty
                             <div class="small text-muted">Không tìm thấy đơn hàng.</div>
                         @endforelse

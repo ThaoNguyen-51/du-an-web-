@@ -139,8 +139,18 @@ class Order extends Model
         return $this->hasMany(OrderMessage::class)->orderBy('created_at', 'asc');
     }
 
+    public function statusHistories()
+    {
+        return $this->hasMany(OrderStatusHistory::class)->with('user')->latest();
+    }
+
     public function chatMessages()
     {
         return $this->hasMany(ChatMessage::class)->orderBy('created_at', 'asc');
+    }
+
+    public function printHistories()
+    {
+        return $this->hasMany(OrderPrintHistory::class)->latest('printed_at');
     }
 }

@@ -39,6 +39,33 @@
         padding: 2.25rem 2rem;
     }
 
+    .search-summary {
+        background: linear-gradient(135deg, #fff7f7, #fff);
+        border: 1px solid #f6d4d6;
+        border-radius: 18px;
+        padding: 1.1rem 1.25rem;
+    }
+
+    .filter-panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+    }
+
+    .filter-panel .form-control,
+    .filter-panel .form-select {
+        border-color: #dfe4ec;
+        border-radius: 10px;
+        min-height: 42px;
+    }
+
+    .filter-panel .form-control:focus,
+    .filter-panel .form-select:focus {
+        border-color: var(--brand-red);
+        box-shadow: 0 0 0 .2rem rgba(215, 25, 33, .1);
+    }
+
     .shop-banner::before {
         content: "";
         position: absolute;
@@ -218,47 +245,89 @@
         font-weight: 700;
     }
 
+    .compare-btn {
+        border: 1px solid #f2c6c8;
+        color: var(--brand-red);
+        background: #fff;
+        border-radius: 12px;
+        padding: .65rem .8rem;
+        font-weight: 700;
+    }
+
+    .compare-btn:hover {
+        color: var(--brand-red-dark);
+        background: var(--brand-red-soft);
+        border-color: var(--brand-red);
+    }
+
     .chat-float-button {
         box-shadow: 0 15px 30px rgba(215, 25, 33, 0.28) !important;
     }
 </style>
 
 <div class="shop-shell container my-4">
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <i class="fa-solid fa-circle-check me-2"></i>{{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    @if(!request('keyword'))
+        <div class="shop-banner mb-4">
+            <div class="shop-banner-content">
+                <span class="eyebrow">Khuyến mại mùa hè</span>
+                <h1 class="display-6 fw-bold text-white mt-3 mb-2">RỰC RỠ HÈ - ĐIỀU HÒA GIÁ SỐC</h1>
+                <p class="lead my-2 fs-6">Miễn phí 100% công lắp đặt và tặng bộ vật tư ống đồng trị giá lên đến 1.000.000đ khi mua điều hòa Casper, Daikin, Panasonic.</p>
+            </div>
+        </div>
+    @else
+        <div class="search-summary mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="eyebrow-sub mb-1">Kết quả tìm kiếm</div>
+                <h1 class="h4 fw-bold mb-0">Sản phẩm cho “{{ request('keyword') }}”</h1>
+            </div>
+            <span class="small text-muted">Tìm thấy <strong class="text-dark">{{ $airConditioners->count() }}</strong> sản phẩm</span>
         </div>
     @endif
 
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <form action="{{ route('shop.index') }}" method="GET" class="filter-panel p-3 mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-4 col-lg-3">
+                <label for="brand" class="form-label small fw-bold text-dark mb-1">Hãng sản xuất</label>
+                <select id="brand" name="brand" class="form-select">
+                    <option value="">Tất cả thương hiệu</option>
+                    @foreach($brands as $brand)
+                        <option value="{{ $brand }}" @selected(request('brand') == $brand)>{{ $brand }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <label for="min_price" class="form-label small fw-bold text-dark mb-1">Giá từ</label>
+                <input id="min_price" type="number" name="min_price" min="0" step="100000" value="{{ request('min_price') }}" class="form-control" placeholder="0 đ">
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <label for="max_price" class="form-label small fw-bold text-dark mb-1">Đến giá</label>
+                <input id="max_price" type="number" name="max_price" min="0" step="100000" value="{{ request('max_price') }}" class="form-control" placeholder="Không giới hạn">
+            </div>
+            <div class="col-12 col-md-5 col-lg-3">
+                <label for="sort" class="form-label small fw-bold text-dark mb-1">Sắp xếp</label>
+                <select id="sort" name="sort" class="form-select">
+                    <option value="">Mới nhất</option>
+                    <option value="price_asc" @selected(request('sort') === 'price_asc')>Giá thấp đến cao</option>
+                    <option value="price_desc" @selected(request('sort') === 'price_desc')>Giá cao đến thấp</option>
+                    <option value="name_asc" @selected(request('sort') === 'name_asc')>Tên A - Z</option>
+                </select>
+            </div>
+            @if(request('keyword'))
+                <input type="hidden" name="keyword" value="{{ request('keyword') }}">
+            @endif
+            <div class="col-12 col-md-3 col-lg-2 d-flex gap-2">
+                <button type="submit" class="btn btn-hc flex-grow-1 fw-semibold"><i class="fa-solid fa-filter me-1"></i>Lọc</button>
+                <a href="{{ route('shop.index', request('keyword') ? ['keyword' => request('keyword')] : []) }}" class="btn btn-light border" title="Xóa bộ lọc" aria-label="Xóa bộ lọc"><i class="fa-solid fa-rotate-left"></i></a>
+            </div>
         </div>
-    @endif
-
-    <div class="shop-banner mb-4">
-        <div class="shop-banner-content">
-            <span class="eyebrow">Khuyến mại mùa hè</span>
-            <h1 class="display-6 fw-bold text-white mt-3 mb-2">RỰC RỠ HÈ - ĐIỀU HÒA GIÁ SỐC</h1>
-            <p class="lead my-2 fs-6">Miễn phí 100% công lắp đặt và tặng bộ vật tư ống đồng trị giá lên đến 1.000.000đ khi mua điều hòa Casper, Daikin, Panasonic.</p>
-        </div>
-    </div>
-
-    <div class="shop-filter p-3 mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="fw-bold small me-1 text-dark"><i class="fa-solid fa-filter text-hc me-1"></i>Hãng sản xuất:</span>
-            <a href="{{ route('shop.index') }}" class="filter-pill {{ !request('brand') ? 'active' : '' }}">Tất cả</a>
+        <div class="d-flex align-items-center gap-2 flex-wrap mt-3 pt-3 border-top">
+            <span class="small fw-bold text-dark me-1"><i class="fa-solid fa-tags text-hc me-1"></i>Chọn nhanh:</span>
+            <a href="{{ route('shop.index', request()->except(['brand', 'page'])) }}" class="filter-pill {{ !request('brand') ? 'active' : '' }}">Tất cả</a>
             @foreach($brands as $brand)
-                <a href="{{ route('shop.index', ['brand' => $brand]) }}" class="filter-pill {{ request('brand') == $brand ? 'active' : '' }}">{{ $brand }}</a>
+                <a href="{{ route('shop.index', array_merge(request()->except(['brand', 'page']), ['brand' => $brand])) }}" class="filter-pill {{ request('brand') == $brand ? 'active' : '' }}">{{ $brand }}</a>
             @endforeach
         </div>
-
-        <div class="small text-muted">
-            Hiển thị <strong class="text-dark">{{ isset($airConditioners) ? $airConditioners->count() : 0 }}</strong> sản phẩm
-        </div>
-    </div>
+    </form>
 
     @php
         $chatRoute = auth()->check()
@@ -272,8 +341,17 @@
 
     <div class="section-header mb-3">
         <div>
-            <div class="eyebrow-sub">Bộ sưu tập</div>
-            <h2>Điều hòa thông minh cho mọi không gian</h2>
+            <div class="eyebrow-sub">{{ request('keyword') ? 'Danh sách phù hợp' : 'Bộ sưu tập' }}</div>
+            <h2>{{ request('keyword') ? 'Sản phẩm bạn đang tìm' : 'Điều hòa thông minh cho mọi không gian' }}</h2>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <a href="{{ route('shop.compare') }}" class="btn btn-sm btn-outline-danger">
+                <i class="fa-solid fa-scale-balanced me-1"></i> So sánh
+                @if(session('compare_products'))
+                    <span class="badge text-bg-danger ms-1">{{ count(session('compare_products')) }}</span>
+                @endif
+            </a>
+            <div class="small text-muted"><strong class="text-dark">{{ $airConditioners->count() }}</strong> sản phẩm</div>
         </div>
     </div>
 
@@ -333,6 +411,12 @@
                                 <a href="{{ route('shop.detail', $item->id) }}" class="btn btn-hc view-btn mt-3 fw-semibold">
                                     <i class="fa-solid fa-eye me-1"></i> Xem chi tiết
                                 </a>
+                                <form action="{{ route('shop.compare.add', $item->id) }}" method="POST" class="mt-2" data-ajax-toast>
+                                    @csrf
+                                    <button type="submit" class="btn compare-btn w-100">
+                                        <i class="fa-solid fa-scale-balanced me-1"></i> So sánh
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>

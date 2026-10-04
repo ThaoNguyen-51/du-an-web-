@@ -9,6 +9,7 @@ use App\Models\OrderMessage;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Schema;
 
 class ChatController extends Controller
 {
@@ -16,8 +17,10 @@ class ChatController extends Controller
     {
         $isAdmin = in_array(auth()->user()->role, ['admin', 'staff'], true);
         $keyword = trim((string) $request->query('keyword', ''));
+        $unreadOnly = $request->boolean('unread');
         $customers = collect();
         $selectedCustomer = null;
+        $unreadCustomerIds = collect();
 
         if ($isAdmin) {
             $customersQuery = User::query()->whereNotIn('role', ['admin', 'staff']);
@@ -41,8 +44,29 @@ class ChatController extends Controller
                         ->orWhereHas('receivedChatMessages');
                 });
             }
+            if ($unreadOnly) {
+                $unreadChatCustomerIds = Schema::hasTable('chat_messages') && Schema::hasColumn('chat_messages', 'read_at')
+                    ? ChatMessage::where('recipient_id', auth()->id())->whereNull('read_at')->pluck('sender_id')
+                    : collect();
+                $unreadOrderCustomerIds = Schema::hasTable('order_messages') && Schema::hasColumn('order_messages', 'read_at')
+                    ? OrderMessage::where('sender_role', 'customer')->whereNull('read_at')->whereHas('order')
+                        ->with('order:id,user_id')->get()->pluck('order.user_id')
+                    : collect();
+                $unreadCustomerIds = $unreadChatCustomerIds->merge($unreadOrderCustomerIds)->unique()->values();
+                $customersQuery->whereIn('id', $unreadCustomerIds);
+            }
 
             $customers = $customersQuery->orderByDesc('id')->limit(60)->get();
+            $unreadCustomerIds = $unreadCustomerIds->isNotEmpty()
+                ? $unreadCustomerIds
+                : collect()
+                    ->merge(Schema::hasTable('chat_messages') && Schema::hasColumn('chat_messages', 'read_at')
+                        ? ChatMessage::where('recipient_id', auth()->id())->whereNull('read_at')->pluck('sender_id')
+                        : collect())
+                    ->merge(Schema::hasTable('order_messages') && Schema::hasColumn('order_messages', 'read_at')
+                        ? OrderMessage::where('sender_role', 'customer')->whereNull('read_at')->with('order:id,user_id')->get()->pluck('order.user_id')
+                        : collect())
+                    ->unique()->values();
             $selectedCustomer = $customers->firstWhere('id', (int) $request->query('customer_id'))
                 ?? $customers->first();
         } else {
@@ -73,6 +97,18 @@ class ChatController extends Controller
         $messages = collect();
 
         if ($selectedCustomer) {
+            if ($isAdmin && Schema::hasTable('chat_messages') && Schema::hasColumn('chat_messages', 'read_at')) {
+                ChatMessage::where('recipient_id', auth()->id())
+                    ->where('sender_id', $selectedCustomer->id)
+                    ->whereNull('read_at')
+                    ->update(['read_at' => now()]);
+                if (Schema::hasTable('order_messages') && Schema::hasColumn('order_messages', 'read_at')) {
+                    OrderMessage::where('sender_role', 'customer')
+                        ->whereNull('read_at')
+                        ->whereHas('order', fn ($query) => $query->where('user_id', $selectedCustomer->id))
+                        ->update(['read_at' => now()]);
+                }
+            }
             $legacyOrderMessages = OrderMessage::with(['sender', 'order'])
                 ->whereHas('order', fn ($query) => $query->where('user_id', $selectedCustomer->id))
                 ->get();
@@ -90,6 +126,8 @@ class ChatController extends Controller
         return view('chat.index', compact(
             'isAdmin',
             'keyword',
+            'unreadOnly',
+            'unreadCustomerIds',
             'customers',
             'selectedCustomer',
             'orders',

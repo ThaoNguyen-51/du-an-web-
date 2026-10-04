@@ -13,20 +13,6 @@
 <div class="container my-4">
     <h3 class="fw-bold mb-4"><i class="fa-solid fa-cart-shopping me-2 text-hc"></i>Giỏ Hàng Của Bạn</h3>
 
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fa-solid fa-circle-check me-2"></i>{{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
     @if($errors->any())
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ $errors->first() }}
@@ -46,6 +32,7 @@
         <form action="{{ route('user.orders.store') }}" method="POST" id="main-checkout-form">
             @csrf
             <input type="hidden" name="shipping_fee" id="input_shipping_fee" value="0">
+            <input type="hidden" name="address_id" id="selected-address-id" value="">
 
             <div class="row g-4">
                 <!-- Cột Trái: Sản phẩm -->
@@ -75,7 +62,7 @@
                                         <tr class="cart-item-row" data-key="{{ $key }}">
                                             <td class="text-center">
                                                 <input type="checkbox" name="selected_items[]" value="{{ $key }}" 
-                                                       class="form-check-input item-checkbox" checked 
+                                                       class="form-check-input item-checkbox" @checked(!session('buy_now_key') || session('buy_now_key') === $key)
                                                        data-unit-price="{{ $unitPrice }}">
                                             </td>
                                             <td>
@@ -130,6 +117,32 @@
                         <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
                             <i class="fa-solid fa-truck-fast me-2 text-hc"></i>Thông Tin Giao Hàng
                         </h5>
+
+                        <div class="mb-3 p-2 rounded border border-danger-subtle bg-danger-subtle">
+                            <label for="saved-address-select" class="form-label small fw-bold mb-1">
+                                <i class="fa-solid fa-bookmark me-1 text-hc"></i>Chọn địa chỉ đã lưu
+                            </label>
+                            <select id="saved-address-select" class="form-select form-select-sm">
+                                <option value="">-- Chọn địa chỉ giao hàng --</option>
+                                @foreach($savedAddresses as $savedAddress)
+                                    <option value="{{ $savedAddress->id }}"
+                                        data-recipient-name="{{ $savedAddress->recipient_name }}"
+                                        data-phone="{{ $savedAddress->phone }}"
+                                        data-detail-address="{{ $savedAddress->address }}"
+                                        data-province-id="{{ $savedAddress->province_id }}"
+                                        data-province="{{ $savedAddress->province }}"
+                                        data-district-id="{{ $savedAddress->district_id }}"
+                                        data-district="{{ $savedAddress->district }}"
+                                        data-ward-code="{{ $savedAddress->ward_code }}"
+                                        data-ward="{{ $savedAddress->ward }}">
+                                        {{ $savedAddress->label }} - {{ $savedAddress->recipient_name }} - {{ $savedAddress->phone }}
+                                        {{ $savedAddress->is_default ? '(Mặc định)' : '' }}
+                                    </option>
+                                @endforeach
+                                <option value="new">Nhập địa chỉ khác</option>
+                            </select>
+                            <div class="form-text">Địa chỉ được lấy từ sổ địa chỉ GHN của bạn.</div>
+                        </div>
                         
                         <div class="mb-2">
                             <label class="form-label small fw-bold">Họ và tên người nhận <span class="text-danger">*</span></label>
@@ -454,6 +467,98 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         wardSelect.addEventListener('change', fetchShippingFee);
+    }
+
+    const savedAddressSelect = document.getElementById('saved-address-select');
+    if (savedAddressSelect) {
+        const addressData = option => option ? ({
+            recipient_name: option.dataset.recipientName || '',
+            phone: option.dataset.phone || '',
+            address: option.dataset.detailAddress || '',
+            province_id: option.dataset.provinceId || '',
+            province: option.dataset.province || '',
+            district_id: option.dataset.districtId || '',
+            district: option.dataset.district || '',
+            ward_code: option.dataset.wardCode || '',
+            ward: option.dataset.ward || ''
+        }) : null;
+        const setSelectValue = (select, value) => {
+            select.value = String(value ?? '');
+        };
+        const setSelectValueOrText = (select, value, text) => {
+            setSelectValue(select, value);
+            if (select.value || !text) return;
+            const normalized = text.trim().toLowerCase();
+            const option = Array.from(select.options).find(item => item.textContent.trim().toLowerCase() === normalized);
+            if (option) select.value = option.value;
+        };
+        const loadDistrictsForAddress = (data, provinceId) => fetch(`${appBaseUrl}/ghn/districts/${provinceId}`)
+            .then(response => response.json())
+            .then(result => {
+                districtSelect.innerHTML = '<option value="">-- Chọn Quận/Huyện --</option>';
+                (Array.isArray(result.data) ? result.data : []).forEach(item => {
+                    districtSelect.innerHTML += `<option value="${item.DistrictID}">${item.DistrictName}</option>`;
+                });
+                districtSelect.disabled = false;
+                setSelectValueOrText(districtSelect, data.district_id, data.district);
+                return fetch(`${appBaseUrl}/ghn/wards/${districtSelect.value}`);
+            });
+        const loadWardsForAddress = (data, provinceId) => loadDistrictsForAddress(data, provinceId)
+            .then(response => response.json())
+            .then(result => {
+                wardSelect.innerHTML = '<option value="">-- Chọn Phường/Xã --</option>';
+                (Array.isArray(result.data) ? result.data : []).forEach(item => {
+                    wardSelect.innerHTML += `<option value="${item.WardCode}">${item.WardName}</option>`;
+                });
+                wardSelect.disabled = false;
+                setSelectValueOrText(wardSelect, data.ward_code, data.ward);
+                fetchShippingFee();
+            });
+        const applySavedAddress = (data) => fetch(`${appBaseUrl}/ghn/provinces`)
+            .then(response => response.json())
+            .then(result => {
+                if (provinceSelect.options.length <= 1) {
+                    (Array.isArray(result.data) ? result.data : []).forEach(item => {
+                        provinceSelect.innerHTML += `<option value="${item.ProvinceID}">${item.ProvinceName}</option>`;
+                    });
+                }
+                setSelectValueOrText(provinceSelect, data.province_id, data.province);
+                if (!provinceSelect.value) throw new Error('Không xác định được tỉnh/thành phố GHN.');
+                return loadWardsForAddress(data, provinceSelect.value);
+            });
+
+        savedAddressSelect.addEventListener('change', function () {
+            if (this.value === 'new' || !this.value) {
+                document.getElementById('selected-address-id').value = '';
+                document.querySelector('[name="customer_name"]').value = '';
+                document.querySelector('[name="customer_phone"]').value = '';
+                document.querySelector('[name="customer_address"]').value = '';
+                provinceSelect.value = '';
+                districtSelect.innerHTML = '<option value="">-- Chọn Quận/Huyện --</option>';
+                wardSelect.innerHTML = '<option value="">-- Chọn Phường/Xã --</option>';
+                districtSelect.disabled = true;
+                wardSelect.disabled = true;
+                fetchShippingFee();
+                return;
+            }
+
+            const data = addressData(this.options[this.selectedIndex]);
+            document.getElementById('selected-address-id').value = this.value;
+            document.querySelector('[name="customer_name"]').value = data.recipient_name || '';
+            document.querySelector('[name="customer_phone"]').value = data.phone || '';
+            document.querySelector('[name="customer_address"]').value = data.address || '';
+            districtSelect.disabled = true;
+            wardSelect.disabled = true;
+            applySavedAddress(data).catch(() => {
+                fetchShippingFee();
+            });
+        });
+
+        const defaultAddress = Array.from(savedAddressSelect.options).find(option => option.dataset.provinceId && option.textContent.includes('(Mặc định)'));
+        if (defaultAddress) {
+            savedAddressSelect.value = defaultAddress.value;
+            savedAddressSelect.dispatchEvent(new Event('change'));
+        }
     }
 
     if (checkAll) {

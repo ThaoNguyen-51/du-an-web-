@@ -21,6 +21,23 @@
     </div>
 
     <!-- Thông báo Alert -->
+    @if($lowStockCount > 0)
+        <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-2 mb-4">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Có <strong>{{ $lowStockCount }}</strong> biến thể sắp hết hàng (từ 1 đến 5 sản phẩm).</span>
+            @if(request('stock') === 'low')
+                <a href="{{ route('air_conditioners.index') }}" class="ms-auto small fw-semibold text-dark">Xem tất cả sản phẩm</a>
+            @else
+                <a href="{{ route('air_conditioners.index', ['stock' => 'low']) }}" class="ms-auto small fw-semibold text-dark">Xem hàng sắp hết</a>
+            @endif
+        </div>
+    @elseif(request('stock') === 'out')
+        <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center gap-2 mb-4">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span>Đang hiển thị các biến thể đã hết hàng.</span>
+            <a href="{{ route('air_conditioners.index') }}" class="ms-auto small fw-semibold text-dark">Xem tất cả</a>
+        </div>
+    @endif
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
             <i class="fa-solid fa-circle-check me-2"></i>{{ session('success') }}
@@ -32,21 +49,23 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-3">
             <form action="{{ route('air_conditioners.index') }}" method="GET" class="row g-2">
-                <div class="col-md-8">
+                <div class="col-lg-4">
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
                         <input type="text" name="keyword" class="form-control border-start-0" placeholder="Tìm kiếm theo tên sản phẩm..." value="{{ request('keyword') }}">
                     </div>
                 </div>
-                <div class="col-md-4 d-flex gap-2">
+                <div class="col-lg-2">
                     <select name="brand" class="form-select">
                         <option value="">-- Tất cả thương hiệu --</option>
-                        <option value="Daikin" {{ request('brand') == 'Daikin' ? 'selected' : '' }}>Daikin</option>
-                        <option value="Casper" {{ request('brand') == 'Casper' ? 'selected' : '' }}>Casper</option>
-                        <option value="Panasonic" {{ request('brand') == 'Panasonic' ? 'selected' : '' }}>Panasonic</option>
+                        @foreach($brands as $brand)
+                            <option value="{{ $brand }}" @selected(request('brand') == $brand)>{{ $brand }}</option>
+                        @endforeach
                     </select>
-                    <button type="submit" class="btn btn-secondary px-4">Lọc</button>
                 </div>
+                <div class="col-lg-2"><select name="stock" class="form-select"><option value="">-- Tồn kho --</option><option value="low" @selected(request('stock') === 'low')>Sắp hết (1-5)</option><option value="out" @selected(request('stock') === 'out')>Hết hàng</option><option value="available" @selected(request('stock') === 'available')>Còn nhiều (&gt;5)</option></select></div>
+                <div class="col-lg-2"><select name="sort" class="form-select"><option value="">Mới cập nhật</option><option value="name_asc" @selected(request('sort') === 'name_asc')>Tên A-Z</option><option value="price_asc" @selected(request('sort') === 'price_asc')>Giá thấp đến cao</option><option value="price_desc" @selected(request('sort') === 'price_desc')>Giá cao đến thấp</option><option value="stock_asc" @selected(request('sort') === 'stock_asc')>Tồn kho thấp trước</option></select></div>
+                <div class="col-lg-2 d-flex gap-2"><button type="submit" class="btn btn-secondary flex-grow-1">Lọc</button><a href="{{ route('air_conditioners.index') }}" class="btn btn-light border" title="Xóa bộ lọc"><i class="fa-solid fa-rotate-left"></i></a></div>
             </form>
         </div>
     </div>
@@ -93,8 +112,9 @@
                                     @if($item->variants && $item->variants->count() > 0)
                                         <div class="d-flex flex-wrap gap-1">
                                             @foreach($item->variants as $variant)
-                                                <span class="badge bg-light text-dark border">
+                                                <span class="badge {{ $variant->stock <= 0 ? 'text-bg-danger' : ($variant->stock <= 5 ? 'text-bg-warning' : 'bg-light text-dark') }} border">
                                                     {{ $variant->capacity_name }}: <strong class="text-danger">{{ number_format($variant->price, 0, ',', '.') }}đ</strong>
+                                                    @if($variant->stock <= 5)<small class="ms-1">({{ $variant->stock <= 0 ? 'hết hàng' : $variant->stock . ' còn' }})</small>@endif
                                                 </span>
                                             @endforeach
                                         </div>

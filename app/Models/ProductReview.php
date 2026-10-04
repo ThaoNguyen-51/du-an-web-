@@ -15,6 +15,7 @@ class ProductReview extends Model
         'order_id',
         'rating',
         'comment',
+        'images',
         'admin_reply',
         'replied_by',
         'replied_at',
@@ -22,6 +23,7 @@ class ProductReview extends Model
 
     protected $casts = [
         'rating' => 'integer',
+        'images' => 'array',
         'replied_at' => 'datetime',
     ];
 
