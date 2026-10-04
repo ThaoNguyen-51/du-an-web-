@@ -124,16 +124,27 @@ Route::post('/compare/{id}', function (Request $request, int $id) {
         return back()->with('error', 'Bạn chỉ có thể so sánh tối đa 4 sản phẩm.');
     }
 
-    $request->session()->put('compare_products', $ids->push($id)->values()->all());
+    $alreadySelected = $ids->contains($id);
+    if (!$alreadySelected) {
+        $ids->push($id);
+        $request->session()->put('compare_products', $ids->values()->all());
+    }
 
     if ($request->expectsJson()) {
         return response()->json([
-            'message' => 'Đã thêm sản phẩm vào danh sách so sánh.',
-            'compare_count' => $ids->count() + 1,
+            'message' => $alreadySelected
+                ? 'Sản phẩm đã có trong danh sách so sánh.'
+                : 'Đã thêm sản phẩm vào danh sách so sánh.',
+            'compare_count' => $ids->count(),
         ]);
     }
 
-    return back()->with('success', 'Đã thêm sản phẩm vào danh sách so sánh.');
+    return back()->with(
+        $alreadySelected ? 'error' : 'success',
+        $alreadySelected
+            ? 'Sản phẩm đã có trong danh sách so sánh.'
+            : 'Đã thêm sản phẩm vào danh sách so sánh.'
+    );
 })->name('shop.compare.add');
 
 Route::delete('/compare/{id}', function (Request $request, int $id) {
@@ -241,9 +252,15 @@ Route::middleware('auth')->group(function () {
                         });
                 };
 
+            $reviewedOrderIds = $airConditioner->reviews()
+                ->where('user_id', auth()->id())
+                ->pluck('order_id')
+                ->filter()
+                ->all();
+
             $customerOrders = auth()->user()->orders()
                 ->whereHas('items', $matchingProduct)
-                ->whereDoesntHave('reviews', fn ($query) => $query->where('air_conditioner_id', $airConditioner->id))
+                ->when($reviewedOrderIds, fn ($query) => $query->whereNotIn('id', $reviewedOrderIds))
                 ->latest();
 
             $eligibleReviewOrders = (clone $customerOrders)
@@ -259,11 +276,14 @@ Route::middleware('auth')->group(function () {
     })->name('shop.detail');
 
 
+    Route::middleware('customer')->group(function () {
+        Route::get('/account', [CustomerAccountController::class, 'index'])->name('account.index');
+    });
+
     // ==============================
     // 4. XÁC THỰC EMAIL (VERIFIED)
     // ==============================
     Route::middleware(['verified', 'customer'])->group(function () {
-        Route::get('/account', [CustomerAccountController::class, 'index'])->name('account.index');
         Route::put('/account/profile', [CustomerAccountController::class, 'updateProfile'])->name('account.profile.update');
         Route::put('/account/password', [CustomerAccountController::class, 'updatePassword'])->name('account.password.update');
         Route::post('/account/addresses', [CustomerAccountController::class, 'storeAddress'])->name('account.addresses.store');

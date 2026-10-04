@@ -18,6 +18,9 @@
         
         /* Fix triệt để menu dropdown bị che hoặc không ấn được */
         header { overflow: visible !important; z-index: 9999 !important; }
+        body.chat-layout > header { position: relative; z-index: 11000 !important; }
+        body.chat-layout > header .dropdown-menu { z-index: 11001 !important; }
+        body.chat-layout > .chat-layout-main { position: relative; z-index: 1; }
         .dropdown-menu { z-index: 10000 !important; }
         .shop-toast-container { position: fixed; top: 88px; right: 24px; z-index: 1200; width: min(390px, calc(100vw - 32px)); }
         .shop-toast { border: 0; border-left: 4px solid #198754; border-radius: 12px; box-shadow: 0 14px 35px rgba(15, 23, 42, .18); animation: shop-toast-in .25s ease-out; }
@@ -82,7 +85,7 @@
                 : 0;
             $adminUnreadMessageCount = \Illuminate\Support\Facades\Schema::hasTable('chat_messages')
                 && \Illuminate\Support\Facades\Schema::hasColumn('chat_messages', 'read_at')
-                ? \App\Models\ChatMessage::where('recipient_id', Auth::id())->whereNull('read_at')->count() : 0;
+                ? \App\Models\ChatMessage::where('sender_role', 'customer')->whereNull('read_at')->count() : 0;
             if (\Illuminate\Support\Facades\Schema::hasTable('order_messages')
                 && \Illuminate\Support\Facades\Schema::hasColumn('order_messages', 'read_at')) {
                 $adminUnreadMessageCount += \App\Models\OrderMessage::where('sender_role', 'customer')->whereNull('read_at')->count();
@@ -98,7 +101,7 @@
                 @if(Auth::user()->role === 'admin')
                     <a href="{{ route('admin.customers.index') }}" class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}"><i class="fa-solid fa-users"></i><span>Khách hàng</span></a>
                 @endif
-                <a href="{{ route('admin.chat.index') }}" class="{{ request()->routeIs('admin.chat.*') ? 'active' : '' }}"><i class="fa-solid fa-comments"></i><span>Tin nhắn</span>@if($adminUnreadMessageCount > 0)<span class="nav-badge" id="admin-message-badge">{{ $adminUnreadMessageCount > 99 ? '99+' : $adminUnreadMessageCount }}</span>@endif</a>
+                <a id="admin-chat-link" href="{{ route('admin.chat.index') }}" class="{{ request()->routeIs('admin.chat.*') ? 'active' : '' }}"><i class="fa-solid fa-comments"></i><span>Tin nhắn</span>@if($adminUnreadMessageCount > 0)<span class="nav-badge" id="admin-message-badge">{{ $adminUnreadMessageCount > 99 ? '99+' : $adminUnreadMessageCount }}</span>@endif</a>
                 <a href="{{ route('admin.coupons.index') }}" class="{{ request()->routeIs('admin.coupons.*') ? 'active' : '' }}"><i class="fa-solid fa-ticket"></i><span>Mã giảm giá</span></a>
                 <div class="admin-nav-label mt-4">Kho & sản phẩm</div>
                 <a href="{{ route('air_conditioners.index') }}" class="{{ request()->routeIs('air_conditioners.*') ? 'active' : '' }}"><i class="fa-solid fa-boxes-stacked"></i><span>Sản phẩm</span>@if($adminLowStockCount > 0)<span class="nav-badge">{{ $adminLowStockCount > 99 ? '99+' : $adminLowStockCount }}</span>@endif</a>
@@ -143,6 +146,7 @@
                     <a href="{{ route('user.cart.index') }}" class="btn btn-outline-light position-relative">
                         <i class="fa-solid fa-cart-shopping"></i>
                         <span class="d-none d-md-inline ms-1">Giỏ hàng</span>
+                        <span data-cart-count class="badge text-bg-warning text-dark position-absolute top-0 start-100 translate-middle {{ collect(session('cart', []))->sum('quantity') ? '' : 'd-none' }}">{{ collect(session('cart', []))->sum('quantity') }}</span>
                     </a>
                 @endif
 
@@ -247,6 +251,20 @@
             };
             window.shopShowToast = showToast;
 
+            const updateCompareCount = (count) => {
+                document.querySelectorAll('[data-compare-count]').forEach((badge) => {
+                    badge.textContent = count;
+                    badge.classList.toggle('d-none', count < 1);
+                });
+            };
+
+            const updateCartCount = (count) => {
+                document.querySelectorAll('[data-cart-count]').forEach((badge) => {
+                    badge.textContent = count;
+                    badge.classList.toggle('d-none', count < 1);
+                });
+            };
+
             document.querySelectorAll('[data-dismiss-shop-toast]').forEach((button) => {
                 button.addEventListener('click', () => removeToast(button.closest('.shop-toast')));
             });
@@ -262,8 +280,18 @@
                     const data = await response.json();
                     const total = document.getElementById('admin-notification-total');
                     if (total) total.textContent = data.total > 99 ? '99+' : data.total;
-                    const messageBadge = document.getElementById('admin-message-badge');
-                    if (messageBadge) messageBadge.textContent = data.counts.messages > 99 ? '99+' : data.counts.messages;
+                    let messageBadge = document.getElementById('admin-message-badge');
+                    const chatLink = document.getElementById('admin-chat-link');
+                    if (data.counts.messages > 0 && !messageBadge && chatLink) {
+                        messageBadge = document.createElement('span');
+                        messageBadge.id = 'admin-message-badge';
+                        messageBadge.className = 'nav-badge';
+                        chatLink.appendChild(messageBadge);
+                    }
+                    if (messageBadge) {
+                        messageBadge.textContent = data.counts.messages > 99 ? '99+' : data.counts.messages;
+                        messageBadge.classList.toggle('d-none', data.counts.messages < 1);
+                    }
                 } catch (error) { /* polling is intentionally best effort */ }
             };
             refreshAdminNotifications();
@@ -287,7 +315,16 @@
                     });
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.message || 'Không thể thực hiện thao tác.');
+                    if (typeof data.compare_count === 'number') {
+                        updateCompareCount(data.compare_count);
+                    }
+                    if (typeof data.cart_count === 'number') {
+                        updateCartCount(data.cart_count);
+                    }
                     showToast(data.message);
+                    if (form.hasAttribute('data-compare-remove')) {
+                        window.setTimeout(() => window.location.reload(), 250);
+                    }
                 } catch (error) {
                     showToast(error.message || 'Đã xảy ra lỗi. Vui lòng thử lại.', 'error');
                 } finally {

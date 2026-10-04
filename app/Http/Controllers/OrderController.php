@@ -66,14 +66,8 @@ class OrderController extends Controller
 
             $query->where(function ($q) use ($keyword) {
                 $q->where('id', 'like', "%{$keyword}%")
-                  ->orWhere('ghn_order_code', 'like', "%{$keyword}%")
-                  ->orWhere('customer_name', 'like', "%{$keyword}%")
-                  ->orWhereHas('messages', function ($messageQuery) use ($keyword) {
-                      $messageQuery->where('message', 'like', "%{$keyword}%");
-                  })
-                  ->orWhereHas('chatMessages', function ($messageQuery) use ($keyword) {
-                      $messageQuery->where('message', 'like', "%{$keyword}%");
-                  });
+                    ->orWhere('ghn_order_code', 'like', "%{$keyword}%")
+                    ->orWhere('virtual_tracking_code', 'like', "%{$keyword}%");
             });
         }
 

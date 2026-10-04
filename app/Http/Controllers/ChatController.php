@@ -46,7 +46,7 @@ class ChatController extends Controller
             }
             if ($unreadOnly) {
                 $unreadChatCustomerIds = Schema::hasTable('chat_messages') && Schema::hasColumn('chat_messages', 'read_at')
-                    ? ChatMessage::where('recipient_id', auth()->id())->whereNull('read_at')->pluck('sender_id')
+                    ? ChatMessage::where('sender_role', 'customer')->whereNull('read_at')->pluck('sender_id')
                     : collect();
                 $unreadOrderCustomerIds = Schema::hasTable('order_messages') && Schema::hasColumn('order_messages', 'read_at')
                     ? OrderMessage::where('sender_role', 'customer')->whereNull('read_at')->whereHas('order')
@@ -61,7 +61,7 @@ class ChatController extends Controller
                 ? $unreadCustomerIds
                 : collect()
                     ->merge(Schema::hasTable('chat_messages') && Schema::hasColumn('chat_messages', 'read_at')
-                        ? ChatMessage::where('recipient_id', auth()->id())->whereNull('read_at')->pluck('sender_id')
+                        ? ChatMessage::where('sender_role', 'customer')->whereNull('read_at')->pluck('sender_id')
                         : collect())
                     ->merge(Schema::hasTable('order_messages') && Schema::hasColumn('order_messages', 'read_at')
                         ? OrderMessage::where('sender_role', 'customer')->whereNull('read_at')->with('order:id,user_id')->get()->pluck('order.user_id')
@@ -98,7 +98,7 @@ class ChatController extends Controller
 
         if ($selectedCustomer) {
             if ($isAdmin && Schema::hasTable('chat_messages') && Schema::hasColumn('chat_messages', 'read_at')) {
-                ChatMessage::where('recipient_id', auth()->id())
+                ChatMessage::where('sender_role', 'customer')
                     ->where('sender_id', $selectedCustomer->id)
                     ->whereNull('read_at')
                     ->update(['read_at' => now()]);

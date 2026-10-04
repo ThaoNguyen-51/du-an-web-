@@ -9,7 +9,7 @@
         <div class="col-md-5"><input name="keyword" value="{{ request('keyword') }}" class="form-control" placeholder="Tìm nội dung nhật ký"></div>
         <div class="col-md-4"><select name="action" class="form-select">
             <option value="">Tất cả sự kiện</option>
-            @foreach(['product_created'=>'Tạo sản phẩm','product_updated'=>'Sửa sản phẩm','price_changed'=>'Sửa giá','stock_changed'=>'Sửa tồn kho','product_deleted'=>'Xóa sản phẩm','order_status_changed'=>'Đổi trạng thái đơn'] as $key => $label)
+            @foreach(['product_created'=>'Tạo sản phẩm','product_updated'=>'Sửa sản phẩm','price_changed'=>'Sửa giá','stock_changed'=>'Sửa tồn kho','product_deleted'=>'Xóa sản phẩm','order_status_changed'=>'Đổi trạng thái đơn','order_printed'=>'In đơn'] as $key => $label)
                 <option value="{{ $key }}" @selected(request('action') === $key)>{{ $label }}</option>
             @endforeach
         </select></div>

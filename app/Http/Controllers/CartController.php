@@ -96,6 +96,13 @@ class CartController extends Controller
                 $cart[$request->key]['quantity'] = max(1, (int)$request->quantity);
                 session()->put('cart', $cart);
 
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Đã cập nhật số lượng!',
+                        'cart_count' => collect($cart)->sum('quantity'),
+                    ]);
+                }
+
                 return redirect()->back()->with('success', 'Đã cập nhật số lượng!');
             }
         }
@@ -115,6 +122,13 @@ class CartController extends Controller
                 unset($cart[$request->key]);
                 session()->put('cart', $cart);
 
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Đã xóa sản phẩm khỏi giỏ hàng!',
+                        'cart_count' => collect($cart)->sum('quantity'),
+                    ]);
+                }
+
                 return redirect()->back()->with('success', 'Đã xóa sản phẩm khỏi giỏ hàng!');
             }
         }
@@ -125,9 +139,17 @@ class CartController extends Controller
     /**
      * Xóa sạch giỏ hàng
      */
-    public function clear()
+    public function clear(Request $request)
     {
         session()->forget('cart');
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Đã xóa toàn bộ giỏ hàng!',
+                'cart_count' => 0,
+            ]);
+        }
+
         return redirect()->back()->with('success', 'Đã xóa toàn bộ giỏ hàng!');
     }
 }

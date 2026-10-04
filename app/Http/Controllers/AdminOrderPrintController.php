@@ -21,6 +21,8 @@ class AdminOrderPrintController extends Controller
 
     public function printOne(Order $order)
     {
+        abort_unless($this->isPrintable($order), 422, 'Chỉ được in đơn từ trạng thái Chờ lấy hàng trở lên.');
+
         $order->load(['items', 'paymentTransactions', 'statusHistories']);
         $this->recordPrint($order, 'single');
 
@@ -40,9 +42,12 @@ class AdminOrderPrintController extends Controller
         $orderIds = collect($validated['order_ids'])->map(fn ($id) => (int) $id)->values()->all();
         $orders = Order::with(['items', 'paymentTransactions', 'statusHistories'])
             ->whereIn('id', $orderIds)
+            ->whereIn('status', $this->printableDatabaseStatuses())
             ->get()
             ->sortBy(fn (Order $order) => array_search($order->id, $orderIds, true))
             ->values();
+
+        abort_if($orders->count() !== count($orderIds), 422, 'Chỉ được in đơn từ trạng thái Chờ lấy hàng trở lên.');
 
         foreach ($orders as $order) {
             $this->recordPrint($order, 'bulk');
@@ -56,7 +61,9 @@ class AdminOrderPrintController extends Controller
 
     private function filteredOrders(Request $request)
     {
-        $query = Order::with(['items', 'paymentTransactions', 'printHistories'])->latest();
+        $query = Order::with(['items', 'paymentTransactions', 'printHistories'])
+            ->whereIn('status', $this->printableDatabaseStatuses())
+            ->latest();
 
         if ($request->filled('keyword')) {
             $keyword = trim($request->keyword);
@@ -102,6 +109,26 @@ class AdminOrderPrintController extends Controller
         }
 
         return $query;
+    }
+
+    private function printableStatuses(): array
+    {
+        return [
+            Order::STATUS_AWAITING_PICKUP,
+            Order::STATUS_AWAITING_DELIVERY,
+            Order::STATUS_IN_TRANSIT,
+            Order::STATUS_COMPLETED,
+        ];
+    }
+
+    private function printableDatabaseStatuses(): array
+    {
+        return array_merge($this->printableStatuses(), ['processing', 'delivered']);
+    }
+
+    private function isPrintable(Order $order): bool
+    {
+        return in_array(Order::normalizeStatus($order->status), $this->printableStatuses(), true);
     }
 
     private function recordPrint(Order $order, string $type): void

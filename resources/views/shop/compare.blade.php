@@ -43,7 +43,7 @@
                                 @endif
                                 <a href="{{ route('shop.detail', $product->id) }}" class="d-block text-dark fw-bold text-decoration-none mt-2">{{ $product->name }}</a>
                                 <div class="text-danger fw-bold mt-2">{{ number_format((float) ($variant?->price ?? $product->price), 0, ',', '.') }} đ</div>
-                                <form action="{{ route('shop.compare.remove', $product->id) }}" method="POST" class="mt-2" data-ajax-toast>
+                                <form action="{{ route('shop.compare.remove', $product->id) }}" method="POST" class="mt-2" data-ajax-toast data-compare-remove>
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-light text-danger border" type="submit"><i class="fa-solid fa-xmark me-1"></i>Bỏ chọn</button>

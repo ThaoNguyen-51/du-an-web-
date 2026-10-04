@@ -297,11 +297,11 @@
             </div>
             <div class="col-6 col-md-3 col-lg-2">
                 <label for="min_price" class="form-label small fw-bold text-dark mb-1">Giá từ</label>
-                <input id="min_price" type="number" name="min_price" min="0" step="100000" value="{{ request('min_price') }}" class="form-control" placeholder="0 đ">
+                <input id="min_price" type="number" name="min_price" min="0" step="1" value="{{ request('min_price') }}" class="form-control" placeholder="0 đ">
             </div>
             <div class="col-6 col-md-3 col-lg-2">
                 <label for="max_price" class="form-label small fw-bold text-dark mb-1">Đến giá</label>
-                <input id="max_price" type="number" name="max_price" min="0" step="100000" value="{{ request('max_price') }}" class="form-control" placeholder="Không giới hạn">
+                <input id="max_price" type="number" name="max_price" min="0" step="1" value="{{ request('max_price') }}" class="form-control" placeholder="Không giới hạn">
             </div>
             <div class="col-12 col-md-5 col-lg-3">
                 <label for="sort" class="form-label small fw-bold text-dark mb-1">Sắp xếp</label>
@@ -347,9 +347,7 @@
         <div class="d-flex align-items-center gap-3">
             <a href="{{ route('shop.compare') }}" class="btn btn-sm btn-outline-danger">
                 <i class="fa-solid fa-scale-balanced me-1"></i> So sánh
-                @if(session('compare_products'))
-                    <span class="badge text-bg-danger ms-1">{{ count(session('compare_products')) }}</span>
-                @endif
+                <span data-compare-count class="badge text-bg-danger ms-1 {{ count(session('compare_products', [])) ? '' : 'd-none' }}">{{ count(session('compare_products', [])) }}</span>
             </a>
             <div class="small text-muted"><strong class="text-dark">{{ $airConditioners->count() }}</strong> sản phẩm</div>
         </div>

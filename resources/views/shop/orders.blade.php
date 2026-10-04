@@ -51,7 +51,7 @@
                         <span class="input-group-text bg-light border-end-0">
                             <i class="fa-solid fa-search text-muted"></i>
                         </span>
-                        <input type="text" name="keyword" value="{{ request('keyword') }}" class="form-control border-start-0" placeholder="Tìm theo mã đơn, mã vận đơn, tên khách, tin nhắn...">
+                        <input type="text" name="keyword" value="{{ request('keyword') }}" class="form-control border-start-0" placeholder="Tìm theo mã đơn hoặc mã vận đơn...">
                     </div>
                 </div>
 
