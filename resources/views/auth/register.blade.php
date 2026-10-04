@@ -3,6 +3,8 @@
 @section('content')
 <style>
     .auth-page { min-height: calc(100vh - 220px); display: flex; align-items: center; }
+    .auth-page > .row { width: 100%; flex: 1 1 100%; }
+    .auth-page .auth-card { width: 100%; }
     .auth-card { border: 1px solid #edf0f5; box-shadow: 0 18px 45px rgba(15, 23, 42, .10); }
     .auth-card .card-header { background: linear-gradient(135deg, #d71921, #a90f16); }
     .auth-card .form-control, .auth-card .input-group-text { background: #f8fafc; border-color: #e5e7eb; }
@@ -12,7 +14,7 @@
     .auth-submit { min-height: 46px; }
 </style>
 <div class="container py-4 auth-page">
-    <div class="row justify-content-center">
+    <div class="row justify-content-center w-100">
         <div class="col-md-6 col-lg-5">
             <div class="card auth-card rounded-4 overflow-hidden">
                 <div class="card-header bg-hc text-white text-center py-4 border-0">
