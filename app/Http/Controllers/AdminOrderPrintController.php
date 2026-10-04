@@ -21,7 +21,11 @@ class AdminOrderPrintController extends Controller
 
     public function printOne(Order $order)
     {
-        abort_unless($this->isPrintable($order), 422, 'Chỉ được in đơn từ trạng thái Chờ lấy hàng trở lên.');
+        if (!$this->isPrintable($order)) {
+            return redirect()
+                ->route('admin.orders.print.index')
+                ->with('error', 'Chỉ được in đơn từ trạng thái Chờ lấy hàng trở lên.');
+        }
 
         $order->load(['items', 'paymentTransactions', 'statusHistories']);
         $this->recordPrint($order, 'single');
@@ -47,7 +51,11 @@ class AdminOrderPrintController extends Controller
             ->sortBy(fn (Order $order) => array_search($order->id, $orderIds, true))
             ->values();
 
-        abort_if($orders->count() !== count($orderIds), 422, 'Chỉ được in đơn từ trạng thái Chờ lấy hàng trở lên.');
+        if ($orders->count() !== count($orderIds)) {
+            return redirect()
+                ->route('admin.orders.print.index')
+                ->with('error', 'Chỉ được in đơn từ trạng thái Chờ lấy hàng trở lên.');
+        }
 
         foreach ($orders as $order) {
             $this->recordPrint($order, 'bulk');
