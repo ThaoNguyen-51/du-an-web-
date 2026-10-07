@@ -36,10 +36,14 @@
                             @php
                                 $variant = $product->variants->first();
                                 $image = $product->primary_image_path ?? $product->image;
+                                $image = trim((string) $image);
+                                $image = filter_var($image, FILTER_VALIDATE_URL)
+                                    ? $image
+                                    : request()->getBaseUrl() . '/storage/' . ltrim(preg_replace('#^(storage/|/storage/)#', '', $image), '/');
                             @endphp
                             <th class="compare-product p-3 text-center">
                                 @if($image)
-                                    <img src="{{ request()->getBaseUrl() . '/storage/' . $image }}" alt="{{ $product->name }}" class="w-100">
+                                    <img src="{{ $image }}" alt="{{ $product->name }}" class="w-100">
                                 @endif
                                 <a href="{{ route('shop.detail', $product->id) }}" class="d-block text-dark fw-bold text-decoration-none mt-2">{{ $product->name }}</a>
                                 <div class="text-danger fw-bold mt-2">{{ number_format((float) ($variant?->price ?? $product->price), 0, ',', '.') }} đ</div>

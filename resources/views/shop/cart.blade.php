@@ -68,7 +68,13 @@
                                             <td>
                                                 <div class="d-flex align-items-center gap-3">
                                                     @if(!empty($item['image']))
-                                                        <img src="{{ request()->getBaseUrl() . '/storage/' . $item['image'] }}" class="rounded border p-1" style="width: 60px; height: 60px; object-fit: contain;">
+                                                        @php
+                                                            $cartImage = trim((string) $item['image']);
+                                                            $cartImageUrl = filter_var($cartImage, FILTER_VALIDATE_URL)
+                                                                ? $cartImage
+                                                                : request()->getBaseUrl() . '/storage/' . ltrim(preg_replace('#^(storage/|/storage/)#', '', $cartImage), '/');
+                                                        @endphp
+                                                        <img src="{{ $cartImageUrl }}" class="rounded border p-1" style="width: 60px; height: 60px; object-fit: contain;" alt="{{ $item['name'] }}">
                                                     @else
                                                         <div class="rounded border bg-light d-flex align-items-center justify-content-center text-muted" style="width: 60px; height: 60px;">No image</div>
                                                     @endif

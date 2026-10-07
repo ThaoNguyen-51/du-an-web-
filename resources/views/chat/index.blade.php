@@ -147,7 +147,11 @@
                                 @endif
                                 @if($message->product?->name)
                                     <div class="chat-context-card">
-                                        @if($message->product->image)<img src="{{ asset('storage/' . $message->product->image) }}" alt="{{ $message->product->name }}">@else<i class="fa-solid fa-snowflake text-danger px-2"></i>@endif
+                                        @if($message->product->image)
+                                            @php($chatImage = trim((string) $message->product->image))
+                                            @php($chatImageUrl = filter_var($chatImage, FILTER_VALIDATE_URL) ? $chatImage : request()->getBaseUrl() . '/storage/' . ltrim(preg_replace('#^(storage/|/storage/)#', '', $chatImage), '/'))
+                                            <img src="{{ $chatImageUrl }}" alt="{{ $message->product->name }}">
+                                        @else<i class="fa-solid fa-snowflake text-danger px-2"></i>@endif
                                         <span><strong>{{ $message->product->name }}</strong><small>{{ $message->product->brand }} · {{ number_format((float) $message->product->price, 0, ',', '.') }} đ</small></span>
                                     </div>
                                 @endif

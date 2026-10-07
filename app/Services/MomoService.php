@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class MomoService
 {
@@ -17,8 +18,8 @@ class MomoService
         $orderId = $order->id . '_' . $transaction->id . '_' . time();
         $requestId = (string) $transaction->id . '_' . time();
         $orderInfo = 'Thanh toan don hang #' . $order->id;
-        $redirectUrl = config('services.momo.redirect_url') ?: route('payment.momo.callback');
-        $ipnUrl = config('services.momo.ipn_url') ?: route('payment.momo.ipn');
+        $redirectUrl = $this->callbackUrl('redirect_url', 'payment.momo.callback');
+        $ipnUrl = $this->callbackUrl('ipn_url', 'payment.momo.ipn');
         $extraData = (string) $order->id;
         $requestType = match ($order->payment_method) {
             'momo_qr' => 'captureWallet',
@@ -55,8 +56,17 @@ class MomoService
                 'verify' => (bool) config('services.momo.verify_ssl', true),
             ])->timeout(20)->post(config('services.momo.endpoint'), $data);
             $result = $response->json() ?? [];
+
+            if (!$response->successful() && empty($result['message'])) {
+                $result['message'] = 'MoMo trả về lỗi HTTP ' . $response->status() . '.';
+            }
         } catch (\Throwable $exception) {
-            $result = ['resultCode' => -1, 'message' => 'Không thể kết nối tới MoMo.'];
+            Log::error('MoMo payment request failed.', [
+                'order_id' => $order->id,
+                'transaction_id' => $transaction->id,
+                'exception' => $exception->getMessage(),
+            ]);
+            $result = ['resultCode' => -1, 'message' => 'Không thể kết nối tới MoMo: ' . $exception->getMessage()];
         }
 
         $transaction->update([
@@ -123,5 +133,24 @@ class MomoService
             . '&transId=' . ($payload['transId'] ?? '');
 
         return hash_equals(hash_hmac('sha256', $rawHash, (string) config('services.momo.secret_key')), (string) $payload['signature']);
+    }
+
+    private function callbackUrl(string $configKey, string $routeName): string
+    {
+        $configuredUrl = trim((string) config('services.momo.' . $configKey));
+        $isLocalUrl = $configuredUrl !== ''
+            && (str_contains(strtolower($configuredUrl), 'localhost')
+                || str_contains(strtolower($configuredUrl), '127.0.0.1')
+                || str_contains(strtolower($configuredUrl), '0.0.0.0'));
+
+        if ($isLocalUrl && app()->environment('production')) {
+            Log::warning('Ignoring local MoMo callback URL in production.', [
+                'config_key' => $configKey,
+                'configured_url' => $configuredUrl,
+            ]);
+            $configuredUrl = '';
+        }
+
+        return $configuredUrl !== '' ? $configuredUrl : route($routeName);
     }
 }

@@ -308,6 +308,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/orders/{id}', [OrderController::class, 'show'])->name('user.orders.show');
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('user.orders.cancel');
         Route::post('/orders/{order}/messages', [OrderController::class, 'sendMessage'])->name('user.orders.sendMessage');
+        Route::get('/orders/{order}/messages', [OrderController::class, 'messages'])->name('user.orders.messages');
         Route::post('/products/{product}/reviews', [ProductReviewController::class, 'store'])->name('product-reviews.store');
         Route::get('/shop/orders/{id}', [OrderController::class, 'show'])->name('shop.orders.show');
         Route::get('/orders/{order}/start-momo', [MomoController::class, 'start'])->name('payment.momo.start');

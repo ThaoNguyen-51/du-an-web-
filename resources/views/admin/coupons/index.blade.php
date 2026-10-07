@@ -35,7 +35,7 @@
                 <div class="col-sm-6 col-lg-2"><label class="form-label" for="new-type">Loại giảm</label><select id="new-type" name="discount_type" class="form-select"><option value="fixed">Số tiền</option><option value="percentage">Phần trăm</option></select></div>
                 <div class="col-sm-6 col-lg-2"><label class="form-label" for="new-value">Mức giảm</label><input id="new-value" name="discount_value" type="number" min="1" step="1" class="form-control" required></div>
                 <div class="col-sm-6 col-lg-2"><label class="form-label" for="new-minimum">Đơn tối thiểu</label><input id="new-minimum" name="minimum_order" type="number" min="0" step="1000" value="0" class="form-control" required></div>
-                <div class="col-sm-6 col-lg-2"><label class="form-label" for="new-cap">Giảm tối đa</label><input id="new-cap" name="maximum_discount" type="number" min="1" step="1000" class="form-control" placeholder="Không giới hạn"></div>
+                <div class="col-sm-6 col-lg-2"><label class="form-label" for="new-cap">Giảm tối đa</label><input id="new-cap" name="maximum_discount" type="number" min="1" step="any" class="form-control" placeholder="Không giới hạn"></div>
                 <div class="col-sm-6 col-lg-2"><label class="form-label" for="new-limit">Lượt dùng</label><input id="new-limit" name="usage_limit" type="number" min="1" class="form-control" placeholder="Không giới hạn"></div>
                 <div class="col-sm-6 col-lg-3"><label class="form-label" for="new-start">Bắt đầu</label><input id="new-start" name="starts_at" type="datetime-local" class="form-control"></div>
                 <div class="col-sm-6 col-lg-3"><label class="form-label" for="new-expiry">Kết thúc</label><input id="new-expiry" name="expires_at" type="datetime-local" class="form-control"></div>
@@ -64,7 +64,7 @@
                                         <select name="discount_type" class="form-select" aria-label="Loại giảm"><option value="fixed" @selected($coupon->discount_type === 'fixed')>Số tiền</option><option value="percentage" @selected($coupon->discount_type === 'percentage')>Phần trăm</option></select>
                                         <input name="discount_value" type="number" min="1" step="1" value="{{ $coupon->discount_value }}" class="form-control" aria-label="Mức giảm">
                                         <input name="minimum_order" type="number" min="0" step="1000" value="{{ $coupon->minimum_order }}" class="form-control" aria-label="Đơn tối thiểu">
-                                        <input name="maximum_discount" type="number" min="1" step="1000" value="{{ $coupon->maximum_discount }}" class="form-control" aria-label="Giảm tối đa" placeholder="Không giới hạn">
+                                        <input name="maximum_discount" type="number" min="1" step="any" value="{{ $coupon->maximum_discount }}" class="form-control" aria-label="Giảm tối đa" placeholder="Không giới hạn">
                                         <input name="starts_at" type="datetime-local" value="{{ $coupon->starts_at?->format('Y-m-d\\TH:i') }}" class="form-control" aria-label="Bắt đầu">
                                         <input name="expires_at" type="datetime-local" value="{{ $coupon->expires_at?->format('Y-m-d\\TH:i') }}" class="form-control" aria-label="Kết thúc">
                                         <input name="usage_limit" type="number" min="1" value="{{ $coupon->usage_limit }}" class="form-control" aria-label="Giới hạn lượt">

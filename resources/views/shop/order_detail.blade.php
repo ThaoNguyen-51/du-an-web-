@@ -137,9 +137,9 @@
                     <i class="fa-solid fa-comments me-2 text-hc"></i>Nhắn tin với shop
                 </div>
                 <div class="card-body">
-                    <div class="message-list mb-3">
+                    <div class="message-list mb-3" id="order-message-list" data-messages-url="{{ route('user.orders.messages', $order) }}">
                         @forelse($order->messages as $message)
-                            <div class="chat-message {{ $message->sender_role === 'customer' ? 'chat-message--customer' : 'chat-message--admin' }}">
+                            <div class="chat-message message-entry {{ $message->sender_role === 'customer' ? 'chat-message--customer' : 'chat-message--admin' }}" data-message-id="{{ $message->id }}">
                                 <div class="message {{ $message->sender_role === 'customer' ? 'message-customer' : 'message-admin' }}">
                                     <div class="small fw-semibold mb-1">
                                         {{ $message->sender_role === 'customer' ? 'Bạn' : 'Shop' }}
@@ -155,12 +155,13 @@
                         @endforelse
                     </div>
 
-                    <form action="{{ route('user.orders.sendMessage', $order) }}" method="POST">
+                    <form action="{{ route('user.orders.sendMessage', $order) }}" method="POST" id="order-message-form">
                         @csrf
                         <div class="input-group">
-                            <input type="text" name="message" class="form-control" placeholder="Nhập tin nhắn cho shop..." maxlength="1000" required>
-                            <button type="submit" class="btn btn-hc">Gửi</button>
+                            <input type="text" name="message" class="form-control" placeholder="Nhập tin nhắn cho shop..." maxlength="1000" required autocomplete="off">
+                            <button type="submit" class="btn btn-hc" id="order-message-submit">Gửi</button>
                         </div>
+                        <div class="small text-danger mt-2" id="order-message-error" role="alert"></div>
                     </form>
                 </div>
             </div>
@@ -197,52 +198,6 @@
                                                         @if(!empty($item->capacity))
                                                             <small class="badge bg-light text-danger border">Công suất: {{ $item->capacity }}</small>
                                                         @endif
-                                                        @if(\App\Models\Order::normalizeStatus($order->status) === \App\Models\Order::STATUS_COMPLETED && $item->airConditioner)
-                                                            @if($item->purchaseReview)
-                                                                <div class="mt-2 small">
-                                                                    <span class="text-success fw-semibold"><i class="fa-solid fa-circle-check me-1"></i>Đã đánh giá</span>
-                                                                    <span class="text-warning ms-1">{{ str_repeat('★', $item->purchaseReview->rating) }}</span>
-                                                                    <p class="mb-1 mt-1 text-break">{{ $item->purchaseReview->comment }}</p>
-                                                                    @if(!empty($item->purchaseReview->images))
-                                                                        <div class="d-flex flex-wrap gap-2 mt-2">
-                                                                            @foreach($item->purchaseReview->images as $reviewImage)
-                                                                                @php($reviewImageUrl = filter_var($reviewImage, FILTER_VALIDATE_URL) ? $reviewImage : asset('storage/' . $reviewImage))
-                                                                                <a href="{{ $reviewImageUrl }}" target="_blank" rel="noopener">
-                                                                                    <img src="{{ $reviewImageUrl }}" alt="Ảnh đánh giá" class="rounded border" style="width:58px;height:58px;object-fit:cover;">
-                                                                                </a>
-                                                                            @endforeach
-                                                                        </div>
-                                                                    @endif
-                                                                    @if($item->purchaseReview->admin_reply)
-                                                                        <div class="text-muted border-start border-2 border-danger ps-2 mt-2">
-                                                                            <strong class="text-danger">Shop phản hồi:</strong> {{ $item->purchaseReview->admin_reply }}
-                                                                        </div>
-                                                                    @endif
-                                                                </div>
-                                                            @else
-                                                                <form action="{{ route('product-reviews.store', $item->airConditioner) }}" method="POST" class="mt-2">
-                                                                    @csrf
-                                                                    <input type="hidden" name="order_id" value="{{ $order->id }}">
-                                                                    <div class="row g-2">
-                                                                        <div class="col-sm-4">
-                                                                            <select name="rating" class="form-select form-select-sm" aria-label="Số sao đánh giá" required>
-                                                                                <option value="5">5 sao</option>
-                                                                                <option value="4">4 sao</option>
-                                                                                <option value="3">3 sao</option>
-                                                                                <option value="2">2 sao</option>
-                                                                                <option value="1">1 sao</option>
-                                                                            </select>
-                                                                        </div>
-                                                                        <div class="col-12">
-                                                                            <textarea name="comment" class="form-control form-control-sm" rows="2" minlength="5" maxlength="2000" placeholder="Chia sẻ nhận xét của bạn..." required></textarea>
-                                                                        </div>
-                                                                        <div class="col-12">
-                                                                            <button type="submit" class="btn btn-sm btn-hc"><i class="fa-solid fa-paper-plane me-1"></i>Gửi đánh giá</button>
-                                                                        </div>
-                                                                    </div>
-                                                                </form>
-                                                            @endif
-                                                        @endif
                                                     </div>
                                                 </div>
                                             </td>
@@ -257,6 +212,7 @@
                             </table>
                         </div>
                     </div>
+
                 </div>
 
                 <div class="card-footer bg-white p-3 border-top">
@@ -280,7 +236,151 @@
                     </div>
                 </div>
             </div>
+
+            @if(\App\Models\Order::normalizeStatus($order->status) === \App\Models\Order::STATUS_COMPLETED)
+                <div class="card border-0 shadow-sm mt-4">
+                    <div class="card-header bg-white fw-bold py-3 border-bottom">
+                        <i class="fa-solid fa-star text-warning me-2"></i>Đánh giá sản phẩm
+                    </div>
+                    <div class="card-body">
+                            <p class="text-muted small mb-3">Chia sẻ trải nghiệm của bạn về các sản phẩm trong đơn hàng.</p>
+                            <div class="row g-3">
+                                @foreach($order->items as $item)
+                                    @if($item->airConditioner)
+                                        <div class="col-12">
+                                            <div class="border rounded p-3">
+                                                <div class="fw-bold text-dark mb-2">{{ $item->product_name }}</div>
+                                                @if($item->purchaseReview)
+                                                    <div class="small">
+                                                        <span class="text-success fw-semibold"><i class="fa-solid fa-circle-check me-1"></i>Đã đánh giá</span>
+                                                        <span class="text-warning ms-1">{{ str_repeat('★', $item->purchaseReview->rating) }}</span>
+                                                        <p class="mb-1 mt-2 text-break">{{ $item->purchaseReview->comment }}</p>
+                                                        @if(!empty($item->purchaseReview->images))
+                                                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                                                @foreach($item->purchaseReview->images as $reviewImage)
+                                                                    @php($reviewImageUrl = filter_var($reviewImage, FILTER_VALIDATE_URL) ? $reviewImage : asset('storage/' . $reviewImage))
+                                                                    <a href="{{ $reviewImageUrl }}" target="_blank" rel="noopener">
+                                                                        <img src="{{ $reviewImageUrl }}" alt="Ảnh đánh giá" class="rounded border" style="width:58px;height:58px;object-fit:cover;">
+                                                                    </a>
+                                                                @endforeach
+                                                            </div>
+                                                        @endif
+                                                        @if($item->purchaseReview->admin_reply)
+                                                            <div class="text-muted border-start border-2 border-danger ps-2 mt-2">
+                                                                <strong class="text-danger">Shop phản hồi:</strong> {{ $item->purchaseReview->admin_reply }}
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @else
+                                                    <form action="{{ route('product-reviews.store', $item->airConditioner) }}" method="POST">
+                                                        @csrf
+                                                        <input type="hidden" name="order_id" value="{{ $order->id }}">
+                                                        <div class="row g-2">
+                                                            <div class="col-sm-4">
+                                                                <select name="rating" class="form-select form-select-sm" aria-label="Số sao đánh giá" required>
+                                                                    <option value="5">5 sao</option>
+                                                                    <option value="4">4 sao</option>
+                                                                    <option value="3">3 sao</option>
+                                                                    <option value="2">2 sao</option>
+                                                                    <option value="1">1 sao</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <textarea name="comment" class="form-control form-control-sm" rows="2" minlength="5" maxlength="2000" placeholder="Chia sẻ nhận xét của bạn..." required></textarea>
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <button type="submit" class="btn btn-sm btn-hc"><i class="fa-solid fa-paper-plane me-1"></i>Gửi đánh giá</button>
+                                                            </div>
+                                                        </div>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const list = document.getElementById('order-message-list');
+    const form = document.getElementById('order-message-form');
+    const input = form?.querySelector('input[name="message"]');
+    const submit = document.getElementById('order-message-submit');
+    const error = document.getElementById('order-message-error');
+    if (!list || !form || !input || !submit) return;
+
+    let newestMessageId = Math.max(0, ...[...list.querySelectorAll('[data-message-id]')].map(el => Number(el.dataset.messageId) || 0));
+
+    const appendMessages = (messages) => {
+        let added = false;
+        messages.forEach(message => {
+            const id = Number(message.id);
+            if (!id || id <= newestMessageId || list.querySelector(`[data-message-id="${id}"]`)) return;
+            const customerMessage = message.sender_role === 'customer';
+            const wrapper = document.createElement('div');
+            wrapper.className = `chat-message message-entry ${customerMessage ? 'chat-message--customer' : 'chat-message--admin'}`;
+            wrapper.dataset.messageId = id;
+            wrapper.innerHTML = `
+                <div class="message ${customerMessage ? 'message-customer' : 'message-admin'}">
+                    <div class="small fw-semibold mb-1">${customerMessage ? 'Bạn' : 'Shop'}</div>
+                    <div></div>
+                    <div class="message-meta mt-1 ${customerMessage ? 'text-white-50' : 'text-muted'}">${message.created_at || ''}</div>
+                </div>`;
+            wrapper.querySelector('.message > div:nth-child(2)').textContent = message.message;
+            list.querySelector('.text-center.text-muted')?.remove();
+            list.appendChild(wrapper);
+            newestMessageId = Math.max(newestMessageId, id);
+            added = true;
+        });
+        if (added) list.scrollTop = list.scrollHeight;
+    };
+
+    const loadMessages = async () => {
+        try {
+            const response = await fetch(list.dataset.messagesUrl, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            appendMessages(data.messages || []);
+        } catch (_) {
+            // A later polling attempt can recover from a temporary network failure.
+        }
+    };
+
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        error.textContent = '';
+        submit.disabled = true;
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Không thể gửi tin nhắn.');
+            }
+            input.value = '';
+            await loadMessages();
+        } catch (exception) {
+            error.textContent = exception.message;
+        } finally {
+            submit.disabled = false;
+            input.focus();
+        }
+    });
+
+    loadMessages();
+    window.setInterval(loadMessages, 3000);
+});
+</script>
 @endsection

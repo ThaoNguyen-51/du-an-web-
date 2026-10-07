@@ -98,7 +98,10 @@ class MomoController extends Controller
 
         return !empty($result['payUrl'])
             ? redirect($result['payUrl'])
-            : redirect()->route('user.orders.show', $order)->with('error', 'Không thể kết nối tới MoMo.');
+            : redirect()->route('user.orders.show', $order)->with(
+                'error',
+                $result['message'] ?? 'MoMo không tạo được liên kết thanh toán.'
+            );
     }
 
     private function completePayment(array $payload, MomoService $momo): string

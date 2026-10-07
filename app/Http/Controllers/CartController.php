@@ -15,6 +15,23 @@ class CartController extends Controller
     {
         // Lấy danh sách sản phẩm trong session cart, mặc định là mảng rỗng
         $cart = session()->get('cart', []);
+        $productIds = collect($cart)->pluck('product_id')->filter()->unique();
+        $products = AirConditioner::with('images')->whereIn('id', $productIds)->get()->keyBy('id');
+
+        foreach ($cart as $key => &$item) {
+            $storedImage = trim((string) ($item['image'] ?? ''));
+            $productImage = $products->get($item['product_id'] ?? null)?->primary_image_path;
+            $image = $storedImage !== '' ? $storedImage : (string) $productImage;
+
+            if ($image !== '' && !filter_var($image, FILTER_VALIDATE_URL)) {
+                $image = preg_replace('#^/?storage/#', '', $image);
+            }
+
+            $item['image'] = $image;
+        }
+        unset($item);
+        session()->put('cart', $cart);
+
         $savedAddresses = auth()->user()->addresses()->orderByDesc('is_default')->latest()->get();
         
         return view('shop.cart', compact('cart', 'savedAddresses'));
@@ -43,7 +60,10 @@ class CartController extends Controller
         $price = $variant && $variant->price ? $variant->price : $product->price;
 
         // Lấy ảnh hiển thị
-        $image = $product->primary_image_path;
+        $image = trim((string) $product->primary_image_path);
+        if (!filter_var($image, FILTER_VALIDATE_URL)) {
+            $image = preg_replace('#^/?storage/#', '', $image);
+        }
 
         // Nếu sản phẩm đã có trong giỏ -> Cộng dồn số lượng
         if (isset($cart[$cartKey])) {

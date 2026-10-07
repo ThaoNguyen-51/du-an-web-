@@ -213,7 +213,7 @@
                 <div class="col-md-4">
                     <h6 class="fw-bold">Chính sách ưu đãi</h6>
                     <p class="small text-secondary mb-1">✓ Bao xài 1 đổi 1 trong 30 ngày</p>
-                    <p class="small text-secondary">✓ Miễn phí vận chuyển & Lắp đặt tận nơi</p>
+                    <p class="small text-secondary">✓ Vận chuyển nhanh chóng, phí giao hàng hiển thị rõ ràng khi đặt hàng</p>
                 </div>
             </div>
             <hr class="border-secondary my-3">
