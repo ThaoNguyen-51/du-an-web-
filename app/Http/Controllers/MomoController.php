@@ -57,7 +57,10 @@ class MomoController extends Controller
 
         if (!$momo->isSuccessful($request->all())) {
             $this->markFailed($request->all(), $momo);
-            return redirect()->route('user.orders.index')->with('error', 'Giao dịch thanh toán thất bại. Bạn có thể thanh toán lại.');
+            return redirect()->route('user.orders.index')->with(
+                'error',
+                'Thanh toán chưa thành công: ' . ($request->input('message') ?: 'MoMo từ chối giao dịch.') . ' Bạn có thể thanh toán lại.'
+            );
         }
 
         $result = $this->completePayment($request->all(), $momo);
@@ -70,7 +73,10 @@ class MomoController extends Controller
             $this->markFailed($request->all(), $momo);
         }
 
-        return redirect()->route('user.orders.index')->with('error', 'Giao dịch thanh toán thất bại. Bạn có thể thanh toán lại.');
+        return redirect()->route('user.orders.index')->with(
+            'error',
+            'Thanh toán chưa được ghi nhận. Bạn có thể thanh toán lại.'
+        );
     }
 
     public function ipn(Request $request, MomoService $momo)
