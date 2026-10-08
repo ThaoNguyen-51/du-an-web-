@@ -139,7 +139,7 @@
                     <div class="chat-messages" id="chat-messages">
                         @forelse($messages as $message)
                             @php($isMine = (int) $message->sender_id === (int) auth()->id())
-                            <div class="chat-row {{ $isMine ? 'mine' : '' }}">
+                            <div class="chat-row {{ $isMine ? 'mine' : '' }}" data-message-key="{{ ($message->chat_message_type ?? 'chat') . '-' . $message->id }}">
                                 <div class="chat-sender">{{ $isAdmin ? ($message->sender_role === 'customer' ? ($message->sender?->name ?? 'Khách hàng') : ($message->sender_role === 'staff' ? ($message->sender?->name ?? 'Nhân viên') : 'Admin')) : ($message->sender_role === 'customer' ? 'Bạn' : 'Shop') }}</div>
                                 <div class="chat-bubble">{{ $message->message }}</div>
                                 @if($message->order_id)
@@ -162,7 +162,7 @@
                         @endforelse
                     </div>
 
-                    <form action="{{ route($isAdmin ? 'admin.chat.send' : 'chat.send') }}" method="POST" class="chat-compose">
+                    <form action="{{ route($isAdmin ? 'admin.chat.send' : 'chat.send') }}" method="POST" class="chat-compose" data-chat-compose>
                         @csrf
                         @if($isAdmin)<input type="hidden" name="customer_id" value="{{ $selectedCustomer->id }}">@endif
                         @if($isAdmin && $keyword !== '')<input type="hidden" name="keyword" value="{{ $keyword }}">@endif
@@ -249,7 +249,104 @@
 </div>
 <script>
     const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.querySelector('[data-chat-compose]');
+    const currentUserId = @json((int) auth()->id());
+    const isAdminChat = @json($isAdmin);
+    const chatMessagesUrl = @json(route($isAdmin ? 'admin.chat.messages' : 'chat.messages', $isAdmin ? ['customer_id' => $selectedCustomer?->id] : []));
+
     if (chatMessages) requestAnimationFrame(() => chatMessages.scrollTop = chatMessages.scrollHeight);
+
+    const appendChatMessage = (message) => {
+        if (!chatMessages || !message?.key || chatMessages.querySelector(`[data-message-key="${message.key}"]`)) return false;
+
+        chatMessages.querySelector('.chat-empty')?.remove();
+        const isMine = Number(message.sender_id) === currentUserId;
+        const row = document.createElement('div');
+        row.className = `chat-row${isMine ? ' mine' : ''}`;
+        row.dataset.messageKey = message.key;
+
+        const sender = document.createElement('div');
+        sender.className = 'chat-sender';
+        sender.textContent = isAdminChat
+            ? (message.sender_role === 'customer' ? 'Khách hàng' : (message.sender_role === 'staff' ? 'Nhân viên' : 'Admin'))
+            : (message.sender_role === 'customer' ? 'Bạn' : 'Shop');
+
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble';
+        bubble.textContent = message.message;
+        row.append(sender, bubble);
+
+        if (message.order_id) {
+            const orderCard = document.createElement('div');
+            orderCard.className = 'chat-context-card';
+            orderCard.textContent = `Đơn #${message.order_id}`;
+            row.appendChild(orderCard);
+        }
+        if (message.product_name) {
+            const productCard = document.createElement('div');
+            productCard.className = 'chat-context-card';
+            productCard.textContent = message.product_name;
+            row.appendChild(productCard);
+        }
+
+        const time = document.createElement('div');
+        time.className = 'chat-time';
+        time.textContent = message.created_at || '';
+        row.appendChild(time);
+        chatMessages.appendChild(row);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return true;
+    };
+
+    let isRefreshingMessages = false;
+    const refreshChatMessages = async () => {
+        if (!chatMessages || isRefreshingMessages) return;
+        isRefreshingMessages = true;
+        try {
+            const response = await fetch(chatMessagesUrl, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            (data.messages || []).forEach(appendChatMessage);
+        } finally {
+            isRefreshingMessages = false;
+        }
+    };
+
+    if (chatForm && chatMessages) {
+        chatForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const submitButton = chatForm.querySelector('.chat-send');
+            const messageInput = chatForm.querySelector('textarea[name="message"]');
+            if (submitButton) submitButton.disabled = true;
+            try {
+                const response = await fetch(chatForm.action, {
+                    method: 'POST',
+                    body: new FormData(chatForm),
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Không thể gửi tin nhắn.');
+                }
+                appendChatMessage(data.message);
+                messageInput.value = '';
+                messageInput.focus();
+            } catch (error) {
+                if (window.shopShowToast) {
+                    window.shopShowToast(error.message || 'Không thể gửi tin nhắn.', 'error');
+                } else {
+                    alert(error.message || 'Không thể gửi tin nhắn.');
+                }
+            } finally {
+                if (submitButton) submitButton.disabled = false;
+            }
+        });
+        window.setInterval(refreshChatMessages, 3000);
+    }
 
     const quickReply = document.getElementById('chat-quick-reply');
     if (quickReply) {

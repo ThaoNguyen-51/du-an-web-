@@ -192,6 +192,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('customer')->group(function () {
         Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+        Route::get('/chat/messages', [ChatController::class, 'messages'])->name('chat.messages');
         Route::post('/chat/messages', [ChatController::class, 'send'])->name('chat.send');
     });
 
@@ -322,6 +323,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/activity-logs', [AdminActivityLogController::class, 'index'])->name('admin.activity-logs.index');
         Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications');
         Route::get('/admin/chat', [ChatController::class, 'index'])->name('admin.chat.index');
+        Route::get('/admin/chat/messages', [ChatController::class, 'messages'])->name('admin.chat.messages');
         Route::post('/admin/chat/messages', [ChatController::class, 'send'])->name('admin.chat.send');
         Route::get('/admin/coupons', [AdminCouponController::class, 'index'])->name('admin.coupons.index');
         Route::post('/admin/coupons', [AdminCouponController::class, 'store'])->name('admin.coupons.store');

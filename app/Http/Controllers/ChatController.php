@@ -109,18 +109,7 @@ class ChatController extends Controller
                         ->update(['read_at' => now()]);
                 }
             }
-            $legacyOrderMessages = OrderMessage::with(['sender', 'order'])
-                ->whereHas('order', fn ($query) => $query->where('user_id', $selectedCustomer->id))
-                ->get();
-            $allChatMessages = ChatMessage::with(['sender', 'product', 'order'])
-                ->where(function ($query) use ($selectedCustomer) {
-                    $query->where('sender_id', $selectedCustomer->id)
-                        ->orWhere('recipient_id', $selectedCustomer->id);
-                })
-                ->get();
-
-            $messages = $legacyOrderMessages->concat($allChatMessages)
-                ->sortBy('created_at')->values();
+            $messages = $this->conversationMessages($selectedCustomer);
         }
 
         return view('chat.index', compact(
@@ -138,6 +127,20 @@ class ChatController extends Controller
             'selectedProduct',
             'messages'
         ));
+    }
+
+    public function messages(Request $request)
+    {
+        $isAdmin = in_array(auth()->user()->role, ['admin', 'staff'], true);
+        $customer = $isAdmin
+            ? User::whereNotIn('role', ['admin', 'staff'])->findOrFail($request->integer('customer_id'))
+            : auth()->user();
+
+        return response()->json([
+            'messages' => $this->conversationMessages($customer)
+                ->map(fn ($message) => $this->messagePayload($message))
+                ->values(),
+        ]);
     }
 
     public function send(Request $request)
@@ -168,14 +171,20 @@ class ChatController extends Controller
             throw ValidationException::withMessages(['message' => 'Hiện chưa có nhân viên shop để nhận tin nhắn.']);
         }
 
-        ChatMessage::create([
+        $message = ChatMessage::create([
             'order_id' => $order?->id,
             'product_id' => $request->input('product_id'),
             'sender_id' => auth()->id(),
             'recipient_id' => $recipient->id,
             'sender_role' => $isAdmin ? auth()->user()->role : 'customer',
             'message' => trim($request->message),
-        ]);
+        ])->load(['sender', 'product', 'order']);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $this->messagePayload($message),
+            ], 201);
+        }
 
         return redirect()->route($isAdmin ? 'admin.chat.index' : 'chat.index', array_filter([
             'customer_id' => $isAdmin ? $customer->id : null,
@@ -184,5 +193,36 @@ class ChatController extends Controller
             'order_search' => $request->input('order_search'),
             'keyword' => $isAdmin ? $request->input('keyword') : null,
         ]))->with('success', 'Đã gửi tin nhắn.');
+    }
+
+    private function conversationMessages(User $customer)
+    {
+        $legacyOrderMessages = OrderMessage::with(['sender', 'order'])
+            ->whereHas('order', fn ($query) => $query->where('user_id', $customer->id))
+            ->get()
+            ->each(fn ($message) => $message->chat_message_type = 'order');
+        $allChatMessages = ChatMessage::with(['sender', 'product', 'order'])
+            ->where(function ($query) use ($customer) {
+                $query->where('sender_id', $customer->id)
+                    ->orWhere('recipient_id', $customer->id);
+            })
+            ->get()
+            ->each(fn ($message) => $message->chat_message_type = 'chat');
+
+        return $legacyOrderMessages->concat($allChatMessages)->sortBy('created_at')->values();
+    }
+
+    private function messagePayload($message): array
+    {
+        return [
+            'key' => ($message->chat_message_type ?? 'chat') . '-' . $message->id,
+            'id' => (int) $message->id,
+            'sender_id' => (int) $message->sender_id,
+            'sender_role' => $message->sender_role,
+            'message' => $message->message,
+            'order_id' => $message->order_id,
+            'product_name' => $message instanceof ChatMessage ? $message->product?->name : null,
+            'created_at' => $message->created_at?->format('H:i · d/m/Y'),
+        ];
     }
 }
